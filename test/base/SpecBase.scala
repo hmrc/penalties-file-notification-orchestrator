@@ -14,17 +14,22 @@
  * limitations under the License.
  */
 
-package repositories
+package base
 
-import javax.inject.Inject
-import models.notification.SDESNotification
-import uk.gov.hmrc.http.HttpResponse
+import config.AppConfig
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.play.guice.GuiceOneAppPerSuite
+import play.api.inject.Injector
+import play.api.mvc.AnyContent
+import play.api.test.FakeRequest
 
-import scala.concurrent.Future
+class SpecBase extends AnyWordSpec with Matchers with GuiceOneAppPerSuite {
 
-class FileNotificationRepositories @Inject()() {
+  lazy val injector: Injector = app.injector
 
-  def storeFileNotifications(notifications: Seq[SDESNotification]): Future[HttpResponse] = {
-    ???
-  }
+  implicit val appConfig: AppConfig = injector.instanceOf[AppConfig]
+
+  val fakeRequest: FakeRequest[AnyContent] = FakeRequest("GET", "/")
+
 }
