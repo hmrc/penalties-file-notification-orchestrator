@@ -36,11 +36,9 @@ class OrchestratorController @Inject()(repository: FileNotificationRepositories,
         Future(BadRequest("Invalid body received i.e. could not be parsed to JSON"))
       })(
         jsonBody => {
-          println(Console.BLUE + jsonBody + Console.RESET)
           val parseResultToModel = Json.fromJson(jsonBody)(Reads.seq(SDESNotification.apiReads))
           parseResultToModel.fold(
             failure => {
-              println(Console.BLUE + parseResultToModel + Console.RESET)
               logger.error("[OrchestratorController][receiveSIDESNotifications] Fail to parse request body to model")
               logger.debug(s"[OrchestratorController][receiveSIDESNotifications] Parse failure(s): $failure")
               Future(BadRequest("Failed to parse to model"))

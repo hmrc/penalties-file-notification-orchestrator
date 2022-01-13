@@ -18,6 +18,7 @@ package repositories
 
 import javax.inject.Inject
 import models.notification.SDESNotification
+import play.api.http.Status._
 import uk.gov.hmrc.http.HttpResponse
 
 import scala.concurrent.Future
