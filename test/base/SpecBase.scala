@@ -14,23 +14,22 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.penaltiesfilenotificationorchestrator.controllers
+package base
 
+import config.AppConfig
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import play.api.http.Status
-import play.api.test.Helpers._
-import play.api.test.{FakeRequest, Helpers}
+import org.scalatestplus.play.guice.GuiceOneAppPerSuite
+import play.api.inject.Injector
+import play.api.mvc.AnyContent
+import play.api.test.FakeRequest
 
-class MicroserviceHelloWorldControllerSpec extends AnyWordSpec with Matchers {
+class SpecBase extends AnyWordSpec with Matchers with GuiceOneAppPerSuite {
 
-  private val fakeRequest = FakeRequest("GET", "/")
-  private val controller = new MicroserviceHelloWorldController(Helpers.stubControllerComponents())
+  lazy val injector: Injector = app.injector
 
-  "GET /" should {
-    "return 200" in {
-      val result = controller.hello()(fakeRequest)
-      status(result) shouldBe Status.OK
-    }
-  }
+  implicit val appConfig: AppConfig = injector.instanceOf[AppConfig]
+
+  val fakeRequest: FakeRequest[AnyContent] = FakeRequest("GET", "/")
+
 }

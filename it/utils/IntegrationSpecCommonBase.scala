@@ -21,13 +21,14 @@ import helpers.WiremockHelper
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, TestSuite}
 import org.scalatestplus.play.guice.GuiceOneServerPerSuite
+import play.api.inject.Injector
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.ws.{WSClient, WSRequest}
 
 trait IntegrationSpecCommonBase extends AnyWordSpec with GuiceOneServerPerSuite with
   BeforeAndAfterAll with BeforeAndAfterEach with TestSuite with WiremockHelper {
 
-  lazy val injector = app.injector
+  lazy val injector: Injector = app.injector
 
   override def afterEach(): Unit = {
     resetAll()
