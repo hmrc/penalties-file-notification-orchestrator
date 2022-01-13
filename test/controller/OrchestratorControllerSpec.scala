@@ -72,9 +72,9 @@ class OrchestratorControllerSpec extends SpecBase {
       when(mockRepo.storeFileNotifications(notifications)).thenReturn(Future.successful(HttpResponse(OK, "")))
       val sdesJson: JsValue = Json.parse(
         """
-          |{
+          |[{
           |   "informationType": "type",
-          |   "file": {
+          |   "files": {
           |       "recipientOrSender": "recipient",
           |       "name": "John Doe",
           |       "location": "place",
@@ -92,7 +92,7 @@ class OrchestratorControllerSpec extends SpecBase {
           |   "audit": {
           |       "correlationID": "12345"
           |   }
-          |}
+          |}]
           |""".stripMargin
       )
       val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest.withJsonBody(sdesJson))
