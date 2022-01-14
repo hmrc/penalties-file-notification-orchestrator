@@ -19,14 +19,14 @@ package controllers
 import javax.inject.Inject
 import models.notification.SDESNotification
 import play.api.libs.json.{Json, Reads}
-import play.api.mvc.{Action, AnyContent, ControllerComponents, Result}
-import repositories.FileNotificationRepositories
+import play.api.mvc.{Action, AnyContent, ControllerComponents}
+import services.NotificationMongoService
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import utils.Logger.logger
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class OrchestratorController @Inject()(repository: FileNotificationRepositories,
+class OrchestratorController @Inject()(mongoService: NotificationMongoService,
                                        cc: ControllerComponents)(implicit ec: ExecutionContext) extends BackendController(cc) {
 
   def receiveSDESNotifications(): Action[AnyContent] = Action.async {
@@ -44,16 +44,12 @@ class OrchestratorController @Inject()(repository: FileNotificationRepositories,
               Future(BadRequest("Failed to parse to model"))
             },
             notifications => {
-              repository.storeFileNotifications(notifications).map {
-                response =>
-                  response.status match {
-                    case OK =>
-                      Ok("")
-                    case _ =>
-                      logger.error(s"[OrchestratorController][receiveSIDESNotifications] Mongo returned unknown status code: ${response.status} ")
-                      logger.debug(s"[OrchestratorController][receiveSIDESNotifications] Failure response body: ${response.body}")
-                      Status(response.status)
-                  }
+              mongoService.insertNotificationRecordsIntoMongo(notifications).map {
+                case true =>
+                  Ok("File Notification inserted")
+                case false =>
+                  logger.error(s"[OrchestratorController][receiveSIDESNotifications] Failed to insert File Notifications")
+                  InternalServerError("Failed to insert File Notifications")
               } recover {
                 case e =>
                   logger.error(s"[OrchestratorController][receiveSIDESNotifications] Unknown exception occurred with message: ${e.getMessage}")

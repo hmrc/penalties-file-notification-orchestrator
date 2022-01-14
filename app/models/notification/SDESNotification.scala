@@ -16,7 +16,7 @@
 
 package models.notification
 
-import play.api.libs.json.{JsValue, Json, Reads, Writes}
+import play.api.libs.json.{JsValue, Json, OFormat, Reads, Writes}
 
 case class SDESNotification(
                              informationType: String,
@@ -30,22 +30,23 @@ object SDESNotification {
   val apiReads: Reads[SDESNotification] = (json: JsValue) => {
     for {
       informationType <- (json \ "informationType").validate[String]
-      files <- (json \ "files").validate[SDESNotificationFile]
+      file <- (json \ "file").validate[SDESNotificationFile]
       audit <- (json \ "audit").validate[SDESAudit]
     } yield {
       SDESNotification(
         informationType,
-        files,
+        file,
         audit
       )
     }
   }
+
+  implicit val mongoFormats: OFormat[SDESNotification] = Json.format[SDESNotification]
 }
 
 case class SDESAudit(correlationID: String)
 
 object SDESAudit {
-  implicit val writes: Writes[SDESAudit] = Json.writes[SDESAudit]
 
-  implicit val reads: Reads[SDESAudit] = Json.reads[SDESAudit]
+  implicit val mongoFormats: OFormat[SDESAudit] = Json.format[SDESAudit]
 }
