@@ -17,15 +17,14 @@
 package controllers
 
 import models.SDESNotificationRecord
-import models.notification.SDESNotification
-import org.mongodb.scala.result.DeleteResult
 import org.mongodb.scala.bson.collection.immutable.Document
-import play.api.libs.json.{JsValue, Json}
-import play.api.test.Helpers.{await, _}
-import utils.IntegrationSpecCommonBase
+import org.mongodb.scala.result.DeleteResult
 import org.scalatest.matchers.should.Matchers._
+import play.api.libs.json.{JsValue, Json}
 import play.api.libs.ws.WSResponse
+import play.api.test.Helpers.{await, _}
 import repositories.FileNotificationRepository
+import utils.IntegrationSpecCommonBase
 
 import scala.concurrent.Future
 

@@ -132,7 +132,7 @@ class OrchestratorControllerSpec extends SpecBase {
         when(mockService.insertNotificationRecordsIntoMongo(notifications)).thenReturn(Future.successful(false))
         val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest.withJsonBody(sdesJson))
         status(result) shouldBe INTERNAL_SERVER_ERROR
-        contentAsString(result) shouldBe "Failed to insert File Notification"
+        contentAsString(result) shouldBe "Failed to insert File Notifications"
       }
 
       "an error is thrown" in new Setup {
