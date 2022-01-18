@@ -16,49 +16,141 @@
 
 package controllers
 
-import play.api.libs.json.{JsValue, Json}
-import play.api.test.Helpers.{await, _}
-import utils.{IntegrationSpecCommonBase, MockFileNotification}
+import models.SDESNotificationRecord
+import org.mongodb.scala.bson.collection.immutable.Document
+import org.mongodb.scala.result.DeleteResult
 import org.scalatest.matchers.should.Matchers._
+import play.api.libs.json.{JsValue, Json}
+import play.api.libs.ws.WSResponse
+import play.api.test.Helpers.{await, _}
+import repositories.FileNotificationRepository
+import utils.IntegrationSpecCommonBase
 
-class OrchestratorControllerISpec extends IntegrationSpecCommonBase with MockFileNotification {
+import scala.concurrent.Future
+
+class OrchestratorControllerISpec extends IntegrationSpecCommonBase {
 
   val controller: OrchestratorController = injector.instanceOf[OrchestratorController]
+  lazy val repository: FileNotificationRepository = injector.instanceOf[FileNotificationRepository]
+
+  def deleteAll(): Future[DeleteResult] =
+    repository
+      .collection
+      .deleteMany(filter = Document())
+      .toFuture
+
+  class Setup {
+    await(deleteAll())
+  }
+
+  val jsonToReceive: JsValue = Json.parse(
+    """
+      |[{
+      |   "informationType": "type",
+      |   "file": {
+      |       "recipientOrSender": "recipient",
+      |       "name": "John Doe",
+      |       "location": "place",
+      |       "checksum": {
+      |           "algorithm": "beep",
+      |           "value": "abc"
+      |       },
+      |       "size": 1,
+      |       "properties": [
+      |       {
+      |           "name": "name",
+      |           "value": "xyz"
+      |       }]
+      |   },
+      |   "audit": {
+      |       "correlationID": "12345"
+      |   }
+      |}]
+      |""".stripMargin
+  )
 
 
-  // TODO: To be implemented when Repositroy is fully implemented
-//  "receiveSDESNotifications" should {
-//    "call FileNotificationRepositories - returns OK" in {
-//      mockFileNotificationStub(OK)
-//      val jsonToReceive: JsValue = Json.parse(
-//        """
-//          |[{
-//          |   "informationType": "type",
-//          |   "files": {
-//          |       "recipientOrSender": "recipient",
-//          |       "name": "John Doe",
-//          |       "location": "place",
-//          |       "checksum": {
-//          |           "algorithm": "beep",
-//          |           "value": "abc"
-//          |       },
-//          |       "size": 1,
-//          |       "properties": [
-//          |       {
-//          |           "name": "name",
-//          |           "value": "xyz"
-//          |       }]
-//          |   },
-//          |   "audit": {
-//          |       "correlationID": "12345"
-//          |   }
-//          |}]
-//          |""".stripMargin
-//      )
-//      val result = await(buildClientForRequestToApp(uri = "/new-notifications").post(
-//        jsonToReceive
-//      ))
-//      result.status shouldBe OK
-//    }
-//  }
+
+  "receiveSDESNotifications" should {
+    "call FileNotificationRepositories - returns OK" in new Setup {
+      val result: WSResponse = await(buildClientForRequestToApp(uri = "/new-notifications").post(
+        jsonToReceive
+      ))
+      result.status shouldBe OK
+      val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().toFuture)
+      recordsInMongoAfterInsertion.size shouldBe 1
+      Json.toJson(Seq(recordsInMongoAfterInsertion.head.notification)) shouldBe jsonToReceive
+    }
+
+    "return BAD_REQUEST (400)" when {
+      "no JSON body is in the request" in new Setup {
+        val result: WSResponse = await(buildClientForRequestToApp(uri = "/new-notifications").post(
+          ""
+        ))
+        result.status shouldBe BAD_REQUEST
+      }
+
+      "JSON body is present but it can not parsed to a model" in new Setup {
+        val result: WSResponse = await(buildClientForRequestToApp(uri = "/new-notifications").post(
+          Json.parse("{}")
+        ))
+        result.status shouldBe BAD_REQUEST
+      }
+    }
+
+    "return error status code" when {
+      "the call to Mongo/stub has a fault" in new Setup {
+        val jsonToReceiveWithDuplicateCorrelationID: JsValue = Json.parse(
+          """
+            |[{
+            |   "informationType": "type",
+            |   "file": {
+            |       "recipientOrSender": "recipient",
+            |       "name": "John Doe",
+            |       "location": "place",
+            |       "checksum": {
+            |           "algorithm": "beep",
+            |           "value": "abc"
+            |       },
+            |       "size": 1,
+            |       "properties": [
+            |       {
+            |           "name": "name",
+            |           "value": "xyz"
+            |       }]
+            |   },
+            |   "audit": {
+            |       "correlationID": "12345"
+            |   }
+            |},
+            |{
+            |   "informationType": "type",
+            |   "file": {
+            |       "recipientOrSender": "recipient",
+            |       "name": "John Doe",
+            |       "location": "place",
+            |       "checksum": {
+            |           "algorithm": "beep",
+            |           "value": "abc"
+            |       },
+            |       "size": 1,
+            |       "properties": [
+            |       {
+            |           "name": "name",
+            |           "value": "xyz"
+            |       }]
+            |   },
+            |   "audit": {
+            |       "correlationID": "12345"
+            |   }
+            |}]
+            |""".stripMargin
+        )
+        val result: WSResponse = await(buildClientForRequestToApp(uri = "/new-notifications").post(
+         jsonToReceiveWithDuplicateCorrelationID
+        ))
+        result.status shouldBe INTERNAL_SERVER_ERROR
+      }
+    }
+  }
 }

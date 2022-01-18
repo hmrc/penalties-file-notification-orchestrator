@@ -16,7 +16,7 @@
 
 package models.notification
 
-import play.api.libs.json.{Json, Reads, Writes}
+import play.api.libs.json.{Json, OFormat}
 
 case class SDESNotificationFile(
                                  recipientOrSender: String,
@@ -28,23 +28,20 @@ case class SDESNotificationFile(
                                )
 
 object SDESNotificationFile {
-  implicit val writes: Writes[SDESNotificationFile] = Json.writes[SDESNotificationFile]
 
-  implicit val reads: Reads[SDESNotificationFile] = Json.reads[SDESNotificationFile]
+  implicit val mongoFormats: OFormat[SDESNotificationFile] = Json.format[SDESNotificationFile]
 }
 
 case class SDESProperties(name: String, value: String)
 
 object SDESProperties {
-  implicit val writes: Writes[SDESProperties] = Json.writes[SDESProperties]
 
-  implicit val reads: Reads[SDESProperties] = Json.reads[SDESProperties]
+  implicit val mongoFormats: OFormat[SDESProperties] = Json.format[SDESProperties]
 }
 
 case class SDESChecksum(algorithm: String, value: String)
 
 object SDESChecksum {
-  implicit val writes: Writes[SDESChecksum] = Json.writes[SDESChecksum]
 
-  implicit val reads: Reads[SDESChecksum] = Json.reads[SDESChecksum]
+  implicit val mongoFormats: OFormat[SDESChecksum] = Json.format[SDESChecksum]
 }

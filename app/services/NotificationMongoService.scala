@@ -14,18 +14,19 @@
  * limitations under the License.
  */
 
-package repositories
+package services
 
 import javax.inject.Inject
+import models.SDESNotificationRecord
 import models.notification.SDESNotification
-import play.api.http.Status._
-import uk.gov.hmrc.http.HttpResponse
+import repositories.FileNotificationRepository
 
 import scala.concurrent.Future
 
-class FileNotificationRepositories @Inject()() {
+class NotificationMongoService @Inject()(repo: FileNotificationRepository) {
 
-  def storeFileNotifications(notifications: Seq[SDESNotification]): Future[HttpResponse] = {
-    ???
+  def insertNotificationRecordsIntoMongo(notifications: Seq[SDESNotification]): Future[Boolean] = {
+    val records = notifications.map(notification => SDESNotificationRecord(reference = notification.audit.correlationID, notification = notification))
+    repo.insertFileNotifications(records)
   }
 }

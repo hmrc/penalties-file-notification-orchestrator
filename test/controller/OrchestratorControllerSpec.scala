@@ -19,28 +19,26 @@ package controller
 import base.SpecBase
 import config.AppConfig
 import controllers.OrchestratorController
-import models.notification.{SDESAudit, SDESChecksum, SDESNotification, SDESNotificationFile, SDESProperties}
+import models.notification._
 import org.mockito.Mockito.{mock, reset, when}
-import play.api.http.Status
-import play.api.test.Helpers._
-import repositories.FileNotificationRepositories
-import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.{JsValue, Json}
-import play.api.mvc.{Action, AnyContent, Result}
-import uk.gov.hmrc.http.HttpResponse
+import play.api.mvc.Result
+import play.api.test.Helpers._
+import repositories.FileNotificationRepository
+import services.NotificationMongoService
 
-import scala.collection.convert.Wrappers.SeqWrapper
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class OrchestratorControllerSpec extends SpecBase {
-  val mockRepo: FileNotificationRepositories = mock(classOf[FileNotificationRepositories])
+  val mockRepo: FileNotificationRepository = mock(classOf[FileNotificationRepository])
+  val mockService: NotificationMongoService = mock(classOf[NotificationMongoService])
   val mockAppConfig: AppConfig = mock(classOf[AppConfig])
 
   class Setup() {
     reset(mockAppConfig)
     reset(mockRepo)
-    val controller = new OrchestratorController(mockRepo, stubControllerComponents())
+    val controller = new OrchestratorController(mockService, stubControllerComponents())
   }
 
   val notifications: Seq[SDESNotification] = Seq(
@@ -67,36 +65,82 @@ class OrchestratorControllerSpec extends SpecBase {
     )
   )
 
+  val sdesJson: JsValue = Json.parse(
+    """
+      |[{
+      |   "informationType": "type",
+      |   "file": {
+      |       "recipientOrSender": "recipient",
+      |       "name": "John Doe",
+      |       "location": "place",
+      |       "checksum": {
+      |           "algorithm": "beep",
+      |           "value": "abc"
+      |       },
+      |       "size": 1,
+      |       "properties": [
+      |       {
+      |           "name": "name",
+      |           "value": "xyz"
+      |       }]
+      |   },
+      |   "audit": {
+      |       "correlationID": "12345"
+      |   }
+      |}]
+      |""".stripMargin
+  )
+
   "receiveSIDESNotifications" should {
-    s"return OK (${Status.OK})" in new Setup {
-      when(mockRepo.storeFileNotifications(notifications)).thenReturn(Future.successful(HttpResponse(OK, "")))
-      val sdesJson: JsValue = Json.parse(
-        """
-          |[{
-          |   "informationType": "type",
-          |   "files": {
-          |       "recipientOrSender": "recipient",
-          |       "name": "John Doe",
-          |       "location": "place",
-          |       "checksum": {
-          |           "algorithm": "beep",
-          |           "value": "abc"
-          |       },
-          |       "size": 1,
-          |       "properties": [
-          |       {
-          |           "name": "name",
-          |           "value": "xyz"
-          |       }]
-          |   },
-          |   "audit": {
-          |       "correlationID": "12345"
-          |   }
-          |}]
-          |""".stripMargin
-      )
-      val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest.withJsonBody(sdesJson))
-      status(result) shouldBe OK
+    "return OK (200)" when {
+      "the JSON request body is successfully inserted into Mongo" in new Setup {
+        when(mockService.insertNotificationRecordsIntoMongo(notifications)).thenReturn(Future.successful(true))
+        val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest.withJsonBody(sdesJson))
+        status(result) shouldBe OK
+      }
+    }
+
+    "return BAD_REQUEST (400)" when {
+      "the JSON request body is invalid" in new Setup {
+        val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest)
+        status(result) shouldBe BAD_REQUEST
+        contentAsString(result) shouldBe "Invalid body received i.e. could not be parsed to JSON"
+      }
+
+      "the request body is valid JSON but can not be serialised to a model" in new Setup {
+        val invalidBody: JsValue = Json.parse(
+          """
+            |[{
+            |   "informationType": "type",
+            |   "file": {
+            |       "recipientOrSender": "recipient",
+            |       "name": "John Doe",
+            |       "location": "place"
+            |   }
+            |}]
+            |""".stripMargin
+        )
+
+        val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest.withJsonBody(invalidBody))
+        status(result) shouldBe BAD_REQUEST
+        contentAsString(result) shouldBe "Failed to parse to model"
+      }
+    }
+
+    "return INTERNAL_SERVER_ERROR (500)" when {
+      "repository fails to insert File Notification" in new Setup {
+        when(mockService.insertNotificationRecordsIntoMongo(notifications)).thenReturn(Future.successful(false))
+        val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest.withJsonBody(sdesJson))
+        status(result) shouldBe INTERNAL_SERVER_ERROR
+        contentAsString(result) shouldBe "Failed to insert File Notifications"
+      }
+
+      "an error is thrown" in new Setup {
+        when(mockService.insertNotificationRecordsIntoMongo(notifications)).thenReturn(Future.failed(new Exception("ERROR")))
+        val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest.withJsonBody(sdesJson))
+        status(result) shouldBe INTERNAL_SERVER_ERROR
+        contentAsString(result) shouldBe "Something went wrong."
+      }
     }
   }
 }
