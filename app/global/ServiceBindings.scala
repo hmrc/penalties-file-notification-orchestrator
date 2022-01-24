@@ -14,21 +14,15 @@
  * limitations under the License.
  */
 
-package config
+package global
 
-import javax.inject.{Inject, Singleton}
-import play.api.Configuration
-import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
+import play.api.{Configuration, Environment}
+import play.api.inject.{Binding, Module}
+import scheduler.jobs.{MonitoringJob, SendFileNotificationsToSDESJob}
 
-@Singleton
-class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig) {
-
-  val authBaseUrl: String = servicesConfig.baseUrl("auth")
-
-  val auditingEnabled: Boolean = config.get[Boolean]("auditing.enabled")
-  val graphiteHost: String     = config.get[String]("microservice.metrics.graphite.host")
-
-  val notificationTtl:Long = config.get[Long]("mongo-config.ttlHours")
-
-
+class ServiceBindings extends Module {
+  override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = Seq(
+    bind[SendFileNotificationsToSDESJob].toSelf.eagerly(),
+    bind[MonitoringJob].toSelf.eagerly()
+  )
 }

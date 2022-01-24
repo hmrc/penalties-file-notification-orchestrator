@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-package config
+package repositories
 
-import javax.inject.{Inject, Singleton}
-import play.api.Configuration
-import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
+import play.api.Logging
+import play.modules.reactivemongo.ReactiveMongoComponent
+import scheduler.ScheduleStatus
+import uk.gov.hmrc.lock.LockMongoRepository
 
-@Singleton
-class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig) {
+import javax.inject.Inject
 
-  val authBaseUrl: String = servicesConfig.baseUrl("auth")
+class LockRepositoryProvider @Inject()(reactiveMongoComponent: ReactiveMongoComponent) {
+  lazy val repo = LockMongoRepository(reactiveMongoComponent.mongoConnector.db)
+}
 
-  val auditingEnabled: Boolean = config.get[Boolean]("auditing.enabled")
-  val graphiteHost: String     = config.get[String]("microservice.metrics.graphite.host")
-
-  val notificationTtl:Long = config.get[Long]("mongo-config.ttlHours")
-
-
+object MongoLockResponses extends Logging {
+  case class UnknownException(e: Exception) extends ScheduleStatus.JobFailed {
+    logger.warn(e.getMessage)
+  }
 }

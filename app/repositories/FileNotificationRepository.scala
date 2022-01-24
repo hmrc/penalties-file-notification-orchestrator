@@ -22,7 +22,6 @@ import org.mongodb.scala.model.{IndexModel, IndexOptions}
 import models.SDESNotificationRecord
 
 import javax.inject.Inject
-import models.notification.SDESNotification
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.MongoComponent
 import utils.Logger.logger
