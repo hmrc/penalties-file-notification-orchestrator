@@ -23,7 +23,7 @@ import play.api.libs.json._
 
 
 case class SDESNotificationRecord(reference: String,
-                                  status: RecordStatusEnum.Value = RecordStatusEnum.PENDING,
+                                    status: RecordStatusEnum.Value = RecordStatusEnum.PENDING,
                                   numberOfAttempts: Int = 0,
                                   createdAt: LocalDateTime = LocalDateTime.now(),
                                   updatedAt: LocalDateTime = LocalDateTime.now(),

@@ -83,4 +83,23 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       recordsInMongoAfterInsertion.last shouldBe notificationRecord2
     }
   }
+
+  "getPendingNotifications" should {
+    "get all the notifications with the PENDING status only" in new Setup {
+      val notificationRecordInPending: SDESNotificationRecord = SDESNotificationRecord(
+        reference = "ref",
+        status = RecordStatusEnum.PENDING,
+        numberOfAttempts = 1,
+        createdAt = LocalDateTime.of(2020,1,1,1,1),
+        updatedAt = LocalDateTime.of(2020,2,2,2,2),
+        nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
+        notification = notification1
+      )
+      val notificationRecord2: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref2", status = RecordStatusEnum.PENDING)
+      val notificationRecord3: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref3", status = RecordStatusEnum.SENT)
+      repository.insertFileNotifications(Seq(notificationRecordInPending, notificationRecord2, notificationRecord3))
+      val result = await(repository.getPendingNotifications())
+      result shouldBe Seq(notificationRecordInPending, notificationRecord2)
+    }
+  }
 }

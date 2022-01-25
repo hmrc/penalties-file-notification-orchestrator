@@ -16,20 +16,28 @@
 
 package services
 
+import connectors.SDESConnector
+import models.FailedJobResponses.FailedToProcessNotifications
+import models.notification.SDESNotification
 import org.joda.time.Duration
 import play.api.Configuration
-import repositories.{LockRepositoryProvider, MongoLockResponses}
+import play.api.http.Status.OK
+import repositories.{FileNotificationRepository, LockRepositoryProvider, MongoLockResponses}
 import scheduler.{ScheduleStatus, ScheduledService}
 import uk.gov.hmrc.lock.LockKeeper
 import utils.Logger.logger
+import utils.TimeMachine
 
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 
 class SendFileNotificationsToSDESService @Inject()(
                                                     lockRepositoryProvider: LockRepositoryProvider,
+                                                    fileNotificationRepository: FileNotificationRepository,
+                                                    sdesConnector: SDESConnector,
+                                                    timeMachine: TimeMachine,
                                                     config: Configuration
-                                                  )(implicit ec: ExecutionContext) extends ScheduledService[Either[ScheduleStatus.JobFailed, Seq[String]]] {
+                                                  )(implicit ec: ExecutionContext) extends ScheduledService[Either[ScheduleStatus.JobFailed, String]] {
 
   val jobName = "SendFileNotificationsToSDESJob"
   lazy val mongoLockTimeoutSeconds: Int = config.get[Int](s"schedules.$jobName.mongoLockTimeout")
@@ -40,19 +48,58 @@ class SendFileNotificationsToSDESService @Inject()(
     override lazy val repo = lockRepositoryProvider.repo
   }
 
-  override def invoke: Future[Either[ScheduleStatus.JobFailed, Seq[String]]] = {
+  override def invoke: Future[Either[ScheduleStatus.JobFailed, String]] = {
     tryLock {
-      logger.debug(s"[$jobName][invoke] - Job started")
-      Future.successful(Right(Seq.empty))
+      logger.info(s"[$jobName][invoke] - Job started")
+      fileNotificationRepository.getPendingNotifications().flatMap {
+        notifications => {
+          logger.debug(s"[SendFileNotificationsToSDESService][invoke] - Amount of notifications: ${notifications.size} before filtering")
+          val notificationCandidates = notifications.filter(notification =>
+            notification.nextAttemptAt.isEqual(timeMachine.now) || notification.nextAttemptAt.isBefore(timeMachine.now))
+          logger.debug(s"[SendFileNotificationsToSDESService][invoke] - Amount of notifications: ${notificationCandidates.size} after filtering")
+          Future.sequence(notificationCandidates.map {
+            notificationWrapper => {
+              val notificationToSend: SDESNotification = notificationWrapper.notification
+              sdesConnector.sendNotificationToSDES(notificationToSend).map {
+                _.status match {
+                  case OK => {
+                    logger.debug(s"[SendFileNotificationsToSDESService][invoke] - Received OK from connector call to SDES")
+                    //set to SENT
+                    true
+                  }
+                  case status if status >= 500 => {
+                    logger.warn(s"[SendFileNotificationsToSDESService][invoke] - Received 5xx status ($status) from connector call to SDES")
+                    //increment retries and set nextAttemptAt to configured values - if retries >= threshold then PERMANENT_FAILURE
+                    false
+                  }
+                  case status if status >= 400 => {
+                    logger.error(s"[SendFileNotificationsToSDESService][invoke] - Received 4xx status ($status) from connector call to SDES")
+                    //set to PERMANENT_FAILURE
+                    false
+                  }
+                }
+              }.recover {
+                case e => {
+                  logger.error(s"[SendFileNotificationsToSDESService][invoke] - Exception occurred processing notifications - message: ${e.getMessage}")
+                  //set to PERMANENT_FAILURE
+                  false
+                }
+              }
+            }
+          })
+        }.map(_.forall(identity))
+      }.map {
+        if (_) Right("Processed all notifications") else Left(FailedToProcessNotifications)
+      }
     }
   }
 
-  def tryLock(f: => Future[Either[ScheduleStatus.JobFailed, Seq[String]]]): Future[Either[ScheduleStatus.JobFailed, Seq[String]]] = {
+  def tryLock(f: => Future[Either[ScheduleStatus.JobFailed, String]]): Future[Either[ScheduleStatus.JobFailed, String]] = {
     lockKeeper.tryLock(f).map {
       case Some(result) => result
       case None =>
         logger.info(s"[$jobName] Locked because it might be running on another instance")
-        Right(Seq(s"$jobName - JobAlreadyRunning"))
+        Right(s"$jobName - JobAlreadyRunning")
     }.recover {
       case e: Exception =>
         logger.info(s"[$jobName] Failed with exception")

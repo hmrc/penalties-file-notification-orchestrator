@@ -25,6 +25,15 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
 
   val authBaseUrl: String = servicesConfig.baseUrl("auth")
 
+  lazy val useStubForSDESCall: Boolean = config.get[Boolean]("feature-switch.useStubForSDESCall")
+
+  private val sdesBaseUrl: String = {
+    if (useStubForSDESCall) servicesConfig.baseUrl("penalties-stub") + "/penalties-stub"
+    else servicesConfig.baseUrl("sdes")
+  }
+
+  val sdesUrl: String = sdesBaseUrl + "/notification/fileready"
+
   val auditingEnabled: Boolean = config.get[Boolean]("auditing.enabled")
   val graphiteHost: String     = config.get[String]("microservice.metrics.graphite.host")
 
