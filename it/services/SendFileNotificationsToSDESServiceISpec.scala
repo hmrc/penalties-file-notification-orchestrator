@@ -50,6 +50,8 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       name = "ame", location = "someUrl", checksum = SDESChecksum(algorithm = "sha", value = "256"), size = 256, properties = Seq.empty[SDESProperties]
     ), audit = SDESAudit("file 1"))
 
+  lazy val dateTimeOfNow: LocalDateTime = LocalDateTime.now()
+
   val notificationRecord: SDESNotificationRecord = SDESNotificationRecord(
     reference = "ref",
     status = RecordStatusEnum.PENDING,
@@ -62,8 +64,8 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
 
   val pendingNotifications = Seq(
     notificationRecord,
-    notificationRecord.copy(reference = "ref1"),
-    notificationRecord.copy(reference = "ref2", nextAttemptAt = LocalDateTime.now().plusMinutes(2))
+    notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow),
+    notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2))
   )
 
   "tryLock" should {
@@ -92,7 +94,11 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       val result = await(service.invoke)
       result.isRight shouldBe true
       result.right.get shouldBe "Processed all notifications"
-      //TODO: check repo to check status change for only eligible notifications
+      val notificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
+      notificationsInRepo.exists(_.equals(notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2)))) shouldBe true
+      notificationsInRepo.find(_.reference == "ref1").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
+      notificationsInRepo.find(_.reference == "ref").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
+      notificationsInRepo.count(_.status == RecordStatusEnum.SENT) shouldBe 2
     }
 
     "process the notifications and return Left if there are failures due to 5xx response" in new Setup {

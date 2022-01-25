@@ -97,9 +97,33 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       )
       val notificationRecord2: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref2", status = RecordStatusEnum.PENDING)
       val notificationRecord3: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref3", status = RecordStatusEnum.SENT)
-      repository.insertFileNotifications(Seq(notificationRecordInPending, notificationRecord2, notificationRecord3))
+      await(repository.insertFileNotifications(Seq(notificationRecordInPending, notificationRecord2, notificationRecord3)))
       val result = await(repository.getPendingNotifications())
       result shouldBe Seq(notificationRecordInPending, notificationRecord2)
+    }
+  }
+
+  "updateFileNotification" should {
+    "update the file notification with the new fields for SENT notifications" in new Setup {
+      lazy val dateTimeNow: LocalDateTime = LocalDateTime.now()
+      val notificationRecordInPending: SDESNotificationRecord = SDESNotificationRecord(
+        reference = "ref",
+        status = RecordStatusEnum.PENDING,
+        numberOfAttempts = 1,
+        createdAt = LocalDateTime.of(2020,1,1,1,1),
+        updatedAt = LocalDateTime.of(2020,2,2,2,2),
+        nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
+        notification = notification1
+      )
+      val updatedNotification: SDESNotificationRecord = notificationRecordInPending.copy(
+        status = RecordStatusEnum.SENT,
+        updatedAt = dateTimeNow
+      )
+      await(repository.insertFileNotifications(Seq(notificationRecordInPending)))
+      await(repository.getPendingNotifications()).size shouldBe 1
+      await(repository.updateFileNotification(updatedNotification))
+      await(repository.getPendingNotifications()).size shouldBe 0
+      await(repository.collection.find(Document()).toFuture()).head shouldBe updatedNotification
     }
   }
 }

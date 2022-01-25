@@ -18,7 +18,7 @@ package services
 
 import connectors.SDESConnector
 import models.FailedJobResponses.FailedToProcessNotifications
-import models.notification.SDESNotification
+import models.notification.{RecordStatusEnum, SDESNotification}
 import org.joda.time.Duration
 import play.api.Configuration
 import play.api.http.Status.OK
@@ -60,22 +60,22 @@ class SendFileNotificationsToSDESService @Inject()(
           Future.sequence(notificationCandidates.map {
             notificationWrapper => {
               val notificationToSend: SDESNotification = notificationWrapper.notification
-              sdesConnector.sendNotificationToSDES(notificationToSend).map {
+              sdesConnector.sendNotificationToSDES(notificationToSend).flatMap {
                 _.status match {
                   case OK => {
                     logger.debug(s"[SendFileNotificationsToSDESService][invoke] - Received OK from connector call to SDES")
-                    //set to SENT
-                    true
+                    val updatedRecord = notificationWrapper.copy(status = RecordStatusEnum.SENT, updatedAt = timeMachine.now)
+                    fileNotificationRepository.updateFileNotification(updatedRecord).map(_ => true)
                   }
                   case status if status >= 500 => {
                     logger.warn(s"[SendFileNotificationsToSDESService][invoke] - Received 5xx status ($status) from connector call to SDES")
                     //increment retries and set nextAttemptAt to configured values - if retries >= threshold then PERMANENT_FAILURE
-                    false
+                    Future.successful(false)
                   }
                   case status if status >= 400 => {
                     logger.error(s"[SendFileNotificationsToSDESService][invoke] - Received 4xx status ($status) from connector call to SDES")
                     //set to PERMANENT_FAILURE
-                    false
+                    Future.successful(false)
                   }
                 }
               }.recover {

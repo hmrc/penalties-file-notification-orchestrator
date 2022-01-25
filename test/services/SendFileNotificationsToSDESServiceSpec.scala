@@ -100,22 +100,31 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
 
     "process the notifications and return Right if they all succeed - only process notifications where nextAttemptAt <= now" in new Setup {
       when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotifications))
+      when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any())).thenReturn(Future.successful(
+        notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = LocalDateTime.now())
+      ))
       when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
         .thenReturn(Future.successful(HttpResponse(OK, "")))
       val result = await(service.invoke)
       result.isRight shouldBe true
       result.right.get shouldBe "Processed all notifications"
       verify(mockSDESConnector, times(2)).sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any())
+      verify(mockFileNotificationRepository, times(2)).updateFileNotification(ArgumentMatchers.any())
     }
 
     "process the notifications and return Left if some fail" in new Setup {
       when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotifications))
+      when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any())).thenReturn(Future.successful(
+        notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = LocalDateTime.now())
+      ))
       when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
         .thenReturn(Future.successful(HttpResponse(OK, "")))
         .thenReturn(Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
       val result = await(service.invoke)
       result.isLeft shouldBe true
       result.left.get shouldBe FailedToProcessNotifications
+      verify(mockSDESConnector, times(2)).sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any())
+      verify(mockFileNotificationRepository, times(1)).updateFileNotification(ArgumentMatchers.any())
     }
 
     "process the notifications and return Left if all fail" in new Setup {
@@ -136,9 +145,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         .thenReturn(Future.successful(true))
       when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
         .thenReturn(Future.successful(()))
-
       await(service.tryLock(expectingResult)) shouldBe Right("")
-
       verify(mockLockRepository, times(1)).lock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any())
     }
