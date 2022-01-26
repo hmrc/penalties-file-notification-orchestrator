@@ -104,7 +104,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = LocalDateTime.now())
       ))
       when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
-        .thenReturn(Future.successful(HttpResponse(OK, "")))
+        .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
       val result = await(service.invoke)
       result.isRight shouldBe true
       result.right.get shouldBe "Processed all notifications"
@@ -118,7 +118,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = LocalDateTime.now())
       ))
       when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
-        .thenReturn(Future.successful(HttpResponse(OK, "")))
+        .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
         .thenReturn(Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
       val result = await(service.invoke)
       result.isLeft shouldBe true

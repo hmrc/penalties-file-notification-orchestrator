@@ -22,7 +22,7 @@ import models.SDESNotificationRecord
 import models.notification.{RecordStatusEnum, SDESNotification}
 import org.joda.time.Duration
 import play.api.Configuration
-import play.api.http.Status.OK
+import play.api.http.Status.NO_CONTENT
 import repositories.{FileNotificationRepository, LockRepositoryProvider, MongoLockResponses}
 import scheduler.{ScheduleStatus, ScheduledService}
 import uk.gov.hmrc.lock.LockKeeper
@@ -65,8 +65,8 @@ class SendFileNotificationsToSDESService @Inject()(
               val notificationToSend: SDESNotification = notificationWrapper.notification
               sdesConnector.sendNotificationToSDES(notificationToSend).flatMap {
                 _.status match {
-                  case OK => {
-                    logger.debug(s"[SendFileNotificationsToSDESService][invoke] - Received OK from connector call to SDES")
+                  case NO_CONTENT => {
+                    logger.debug(s"[SendFileNotificationsToSDESService][invoke] - Received NO_CONTENT from connector call to SDES")
                     val updatedRecord: SDESNotificationRecord = notificationWrapper.copy(status = RecordStatusEnum.SENT, updatedAt = timeMachine.now)
                     fileNotificationRepository.updateFileNotification(updatedRecord).map(_ => true)
                   }

@@ -49,9 +49,9 @@ class SDESConnectorSpec extends SpecBase {
       when(mockHttpClient.POST[SDESNotification, HttpResponse](ArgumentMatchers.eq("stub/notifications/fileready"), ArgumentMatchers.any(),
         ArgumentMatchers.any())(ArgumentMatchers.any(),
         ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
-        .thenReturn(Future.successful(HttpResponse(OK, "")))
+        .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
       val result = await(connector.sendNotificationToSDES(notification))
-      result.status shouldBe OK
+      result.status shouldBe NO_CONTENT
     }
   }
 }
