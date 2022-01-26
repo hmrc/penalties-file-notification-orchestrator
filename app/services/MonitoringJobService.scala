@@ -18,17 +18,19 @@ package services
 
 import org.joda.time.Duration
 import play.api.Configuration
-import repositories.{LockRepositoryProvider, MongoLockResponses}
+import repositories.{FileNotificationRepository, LockRepositoryProvider, MongoLockResponses}
 import scheduler.{ScheduleStatus, ScheduledService}
-import uk.gov.hmrc.lock.LockKeeper
+import uk.gov.hmrc.lock.{LockKeeper, LockRepository}
 import utils.Logger.logger
-
 import javax.inject.Inject
+import models.notification.RecordStatusEnum
+
 import scala.concurrent.{ExecutionContext, Future}
 
 class MonitoringJobService @Inject()(
                                       lockRepositoryProvider: LockRepositoryProvider,
-                                      config: Configuration
+                                      config: Configuration,
+                                      repository: FileNotificationRepository
                                     )(implicit ec: ExecutionContext) extends ScheduledService[Either[ScheduleStatus.JobFailed, Seq[String]]] {
 
   val jobName = "MonitoringJob"
@@ -37,13 +39,24 @@ class MonitoringJobService @Inject()(
   lazy val lockKeeper: LockKeeper = new LockKeeper() {
     override val lockId = s"schedules.$jobName"
     override val forceLockReleaseAfter: Duration = Duration.standardSeconds(mongoLockTimeoutSeconds)
-    override lazy val repo = lockRepositoryProvider.repo
+    override lazy val repo: LockRepository = lockRepositoryProvider.repo
   }
 
   override def invoke: Future[Either[ScheduleStatus.JobFailed, Seq[String]]] = {
     tryLock {
       logger.debug(s"[$jobName][invoke] - Job started")
-      Future.successful(Right(Seq.empty))
+      for {
+        countOfPendingNotifications <- repository.countRecordsByStatus(RecordStatusEnum.PENDING)
+        countOfSentNotifications <- repository.countRecordsByStatus(RecordStatusEnum.SENT)
+        countOfFailureNotifications <- repository.countRecordsByStatus(RecordStatusEnum.PERMANENT_FAILURE)
+      } yield {
+        val logOfPendingNotificationsCount = s"[MonitoringJobService][invoke] - Count of Pending Notifications: $countOfPendingNotifications"
+        val logOfSentNotificationsCount = s"[MonitoringJobService][invoke] - Count of Sent Notifications: $countOfSentNotifications"
+        val logOfFailedNotificationsCount = s"[MonitoringJobService][invoke] - Count of Failed Notifications: $countOfFailureNotifications"
+        val seqOfLogs = Seq(logOfPendingNotificationsCount, logOfSentNotificationsCount, logOfFailedNotificationsCount)
+        seqOfLogs.foreach(logger.info(_))
+        Right(seqOfLogs)
+      }
     }
   }
 

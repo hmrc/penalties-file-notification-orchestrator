@@ -17,12 +17,13 @@
 package services
 
 import base.SpecBase
+import models.notification.RecordStatusEnum
 import org.joda.time.Duration
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.{mock, reset, times, verify, when}
 import play.api.Configuration
 import play.api.test.Helpers._
-import repositories.{LockRepositoryProvider, MongoLockResponses}
+import repositories.{FileNotificationRepository, LockRepositoryProvider, MongoLockResponses}
 import uk.gov.hmrc.lock.LockRepository
 import utils.LogCapturing
 import utils.Logger.logger
@@ -34,6 +35,7 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
   val mockLockRepositoryProvider: LockRepositoryProvider = mock(classOf[LockRepositoryProvider])
   val mockLockRepository: LockRepository = mock(classOf[LockRepository])
   val mockConfig: Configuration = mock(classOf[Configuration])
+  val mockRepo: FileNotificationRepository = mock(classOf[FileNotificationRepository])
   val jobName = "MonitoringJob"
 
   val mongoLockId: String = s"schedules.$jobName"
@@ -41,8 +43,8 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
   val releaseDuration: Duration = Duration.standardSeconds(mongoLockTimeout)
 
   class Setup(withMongoLockStubs: Boolean = true) {
-    reset(mockLockRepository, mockLockRepositoryProvider, mockConfig)
-    val service = new MonitoringJobService(mockLockRepositoryProvider, mockConfig)
+    reset(mockLockRepository, mockLockRepositoryProvider, mockConfig, mockRepo)
+    val service = new MonitoringJobService(mockLockRepositoryProvider, mockConfig, mockRepo)
 
     when(mockConfig.get[Int](ArgumentMatchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(ArgumentMatchers.any()))
       .thenReturn(mongoLockTimeout)
@@ -57,16 +59,31 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
   }
 
   "invoke" should {
-    "start the job" in new Setup {
-      val result = await(service.invoke)
-      result.isRight shouldBe true
-      result.right.get.isEmpty shouldBe true
+    "return the count of all records by Status and log them out" in new Setup {
+      when(mockRepo.countRecordsByStatus(ArgumentMatchers.eq(RecordStatusEnum.PENDING))).thenReturn(Future.successful(1L))
+      when(mockRepo.countRecordsByStatus(ArgumentMatchers.eq(RecordStatusEnum.SENT))).thenReturn(Future.successful(2L))
+      when(mockRepo.countRecordsByStatus(ArgumentMatchers.eq(RecordStatusEnum.PERMANENT_FAILURE))).thenReturn(Future.successful(3L))
+
+      withCaptureOfLoggingFrom(logger){
+        logs => {
+          val result = await(service.invoke)
+          result.isRight shouldBe true
+          result.right.get shouldBe Seq(
+            "[MonitoringJobService][invoke] - Count of Pending Notifications: 1",
+            "[MonitoringJobService][invoke] - Count of Sent Notifications: 2",
+            "[MonitoringJobService][invoke] - Count of Failed Notifications: 3"
+          )
+          logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Pending Notifications: 1") shouldBe true
+          logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Sent Notifications: 2") shouldBe true
+          logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Failed Notifications: 3") shouldBe true
+        }
+      }
     }
   }
 
   "tryLock" should {
     "return a Future successful when lockRepository is able to lock and unlock successfully" in new Setup {
-      val expectingResult = Future.successful(Right(Seq.empty))
+      val expectingResult: Future[Right[Nothing, Seq[Nothing]]] = Future.successful(Right(Seq.empty))
       when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
       when(mockLockRepository.lock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
