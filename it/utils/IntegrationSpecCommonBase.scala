@@ -57,6 +57,14 @@ trait IntegrationSpecCommonBase extends AnyWordSpec with GuiceOneServerPerSuite 
   }
 
   override lazy val app = new GuiceApplicationBuilder()
+    .configure(
+      Map(
+        "microservice.services.penalties-stub.host" -> stubHost,
+        "microservice.services.penalties-stub.port" -> stubPort,
+        "microservice.services.sdes.host" -> stubHost,
+        "microservice.services.penalties-stub.port" -> stubPort
+      )
+    )
     .build()
 
   lazy val ws = app.injector.instanceOf[WSClient]
@@ -64,5 +72,4 @@ trait IntegrationSpecCommonBase extends AnyWordSpec with GuiceOneServerPerSuite 
   def buildClientForRequestToApp(baseUrl: String = "/penalties-file-notification-orchestrator", uri: String): WSRequest = {
     ws.url(s"http://localhost:$port$baseUrl$uri").withFollowRedirects(false)
   }
-
 }

@@ -29,7 +29,7 @@ lazy val microservice = Project(appName, file("."))
   .settings(
     ScoverageKeys.coverageExcludedPackages := "controllers.testOnly.*",
     ScoverageKeys.coverageExcludedFiles := "<empty>;Reverse.*;..*components.*;" +
-      ".*Routes.*;.*ControllerConfiguration;.*Modules;",
+      ".*Routes.*;.*ControllerConfiguration;.*Modules;.*scheduler.*;",
     ScoverageKeys.coverageMinimum := 90,
     ScoverageKeys.coverageFailOnMinimum := false,
     ScoverageKeys.coverageHighlighting := true)

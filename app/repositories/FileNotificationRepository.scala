@@ -16,14 +16,15 @@
 
 package repositories
 
+import com.mongodb.client.model.Updates.{combine, set}
 import config.AppConfig
 import org.mongodb.scala.model.Indexes.ascending
 import org.mongodb.scala.model.{IndexModel, IndexOptions}
 import models.SDESNotificationRecord
-
+import models.notification.RecordStatusEnum
+import org.mongodb.scala.model.Filters.equal
 import javax.inject.Inject
-import models.notification.SDESNotification
-import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
+import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
 import uk.gov.hmrc.mongo.MongoComponent
 import utils.Logger.logger
 
@@ -32,17 +33,17 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
                                            appConfig: AppConfig)(implicit ec: ExecutionContext)
-  extends PlayMongoRepository[SDESNotificationRecord] (
-  collectionName = "sdes-file-notifications",
+  extends PlayMongoRepository[SDESNotificationRecord](
+    collectionName = "sdes-file-notifications",
     mongoComponent = mongoComponent,
     domainFormat = SDESNotificationRecord.mongoFormats,
     indexes = Seq(
       IndexModel(
         ascending("reference"), IndexOptions().unique(true)
       ),
+      IndexModel(ascending("status")),
       IndexModel(ascending("createdAt"), IndexOptions().expireAfter(appConfig.notificationTtl, TimeUnit.HOURS))
-    ))
-  {
+    )) {
 
   def insertFileNotifications(records: Seq[SDESNotificationRecord]): Future[Boolean] = {
     collection.insertMany(records).toFuture().map(_.wasAcknowledged())
@@ -52,4 +53,18 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
           false
       }
   }
+
+  def updateFileNotification(record: SDESNotificationRecord): Future[SDESNotificationRecord] = {
+    collection.findOneAndUpdate(equal("reference", record.reference), combine(
+      set("nextAttemptAt", Codecs.toBson(record.nextAttemptAt)),
+      set("status", record.status.toString),
+      set("numberOfAttempts", record.numberOfAttempts),
+      set("updatedAt", Codecs.toBson(record.updatedAt))
+    )).toFuture()
+  }
+
+  def getPendingNotifications(): Future[Seq[SDESNotificationRecord]] = {
+    collection.find(equal("status", RecordStatusEnum.PENDING.toString)).toFuture()
+  }
+
 }
