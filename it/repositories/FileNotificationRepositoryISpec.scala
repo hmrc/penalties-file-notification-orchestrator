@@ -126,4 +126,27 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       await(repository.collection.find(Document()).toFuture()).head shouldBe updatedNotification
     }
   }
+
+  "countRecordsByStatus" should {
+    "count all records by their status" in new Setup {
+      val notificationRecordInPending: SDESNotificationRecord = SDESNotificationRecord(
+        reference = "ref",
+        status = RecordStatusEnum.PENDING,
+        numberOfAttempts = 1,
+        createdAt = LocalDateTime.of(2020,1,1,1,1),
+        updatedAt = LocalDateTime.of(2020,2,2,2,2),
+        nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
+        notification = notification1
+      )
+
+      val notificationRecordInSent: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref1",
+        status = RecordStatusEnum.SENT)
+      val notificationRecordInFailure: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref2",
+        status = RecordStatusEnum.PERMANENT_FAILURE)
+      await(repository.insertFileNotifications(Seq(notificationRecordInPending, notificationRecordInSent, notificationRecordInFailure)))
+      await(repository.countRecordsByStatus(RecordStatusEnum.PENDING)) shouldBe 1
+      await(repository.countRecordsByStatus(RecordStatusEnum.SENT)) shouldBe 1
+      await(repository.countRecordsByStatus(RecordStatusEnum.PERMANENT_FAILURE)) shouldBe 1
+    }
+  }
 }

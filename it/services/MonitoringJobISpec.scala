@@ -16,22 +16,31 @@
 
 package services
 
+import java.time.LocalDateTime
+
+import models.SDESNotificationRecord
+import models.notification.{RecordStatusEnum, SDESAudit, SDESChecksum, SDESNotification, SDESNotificationFile, SDESProperties}
 import org.joda.time.Duration
+import org.mongodb.scala.Document
 import org.scalatest.matchers.should.Matchers._
 import play.api.test.Helpers._
-import repositories.LockRepositoryProvider
+import repositories.{FileNotificationRepository, LockRepositoryProvider}
 import uk.gov.hmrc.lock.LockRepository
-import utils.IntegrationSpecCommonBase
+import utils.{IntegrationSpecCommonBase, LogCapturing}
+import utils.Logger.logger
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class MonitoringJobISpec extends IntegrationSpecCommonBase {
+class MonitoringJobISpec extends IntegrationSpecCommonBase with LogCapturing {
   class Setup {
     val lockRepositoryProviderRepo: LockRepository = app.injector.instanceOf[LockRepositoryProvider].repo
     val service: MonitoringJobService = app.injector.instanceOf[MonitoringJobService]
+    val repo: FileNotificationRepository = app.injector.instanceOf[FileNotificationRepository]
     await(lockRepositoryProviderRepo.drop)
     await(lockRepositoryProviderRepo.ensureIndexes)
     await(lockRepositoryProviderRepo.count) shouldBe 0
+    await(repo.collection.deleteMany(Document()).toFuture())
+    await(repo.collection.countDocuments().toFuture()) shouldBe 0
   }
 
   "tryLock" should {
@@ -47,11 +56,44 @@ class MonitoringJobISpec extends IntegrationSpecCommonBase {
     }
   }
 
+  val notification1: SDESNotification = SDESNotification(informationType = "info",
+    file = SDESNotificationFile(
+      recipientOrSender = "penalties",
+      name = "ame", location = "someUrl", checksum = SDESChecksum(algorithm = "sha", value = "256"), size = 256, properties = Seq.empty[SDESProperties]
+    ), audit = SDESAudit("file 1"))
+
+  val pendingNotificationRecord: SDESNotificationRecord = SDESNotificationRecord(
+    reference = "ref",
+    status = RecordStatusEnum.PENDING,
+    numberOfAttempts = 1,
+    createdAt = LocalDateTime.of(2020,1,1,1,1),
+    updatedAt = LocalDateTime.of(2020,2,2,2,2),
+    nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
+    notification = notification1
+  )
+
+  val sentNotificationRecord: SDESNotificationRecord = pendingNotificationRecord.copy(reference = "ref2", status = RecordStatusEnum.SENT)
+
+  val failedNotificationRecord: SDESNotificationRecord = pendingNotificationRecord.copy(reference = "ref3", status = RecordStatusEnum.PERMANENT_FAILURE)
+
   "invoke" should {
-    "return a Right(Seq.empty)" in new Setup {
-      val result = await(service.invoke)
-      result.isRight shouldBe true
-      result.right.get.isEmpty shouldBe true
+    "return the count of all records by Status and log them out" in new Setup {
+      await(repo.insertFileNotifications(Seq(pendingNotificationRecord, sentNotificationRecord, failedNotificationRecord)))
+
+      withCaptureOfLoggingFrom(logger){
+        logs => {
+          val result = await(service.invoke)
+          result.isRight shouldBe true
+          result.right.get shouldBe Seq(
+            "[MonitoringJobService][invoke] - Count of Pending Notifications: 1",
+            "[MonitoringJobService][invoke] - Count of Sent Notifications: 1",
+            "[MonitoringJobService][invoke] - Count of Failed Notifications: 1"
+          )
+          logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Pending Notifications: 1") shouldBe true
+          logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Sent Notifications: 1") shouldBe true
+          logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Failed Notifications: 1") shouldBe true
+        }
+      }
     }
   }
 }
