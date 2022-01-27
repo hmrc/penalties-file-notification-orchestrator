@@ -20,4 +20,5 @@ import scheduler.ScheduleStatus
 
 object FailedJobResponses {
     object FailedToProcessNotifications extends ScheduleStatus.JobFailed
+    object UnknownProcessingException extends ScheduleStatus.JobFailed
 }

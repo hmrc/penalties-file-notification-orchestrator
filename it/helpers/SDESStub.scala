@@ -23,7 +23,7 @@ import play.api.http.Status._
 object SDESStub {
   def successfulStubResponse(): StubMapping = stubFor(post(urlEqualTo("/penalties-stub/notification/fileready")).willReturn(
     aResponse()
-      .withStatus(OK)
+      .withStatus(NO_CONTENT)
       .withBody("")
   ))
 
