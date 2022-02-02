@@ -35,7 +35,9 @@ case class SDESCallback(
 case class Properties(name: String, value: String)
 
 object SDESCallback {
-  implicit val formatProperties: Reads[Properties] = Json.reads[Properties]
   implicit val format: Reads[SDESCallback] = Json.reads[SDESCallback]
+}
 
+object Properties {
+  implicit val formatProperties: Reads[Properties] = Json.reads[Properties]
 }

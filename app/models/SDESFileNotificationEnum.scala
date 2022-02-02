@@ -20,10 +20,10 @@ import play.api.libs.json.{JsError, JsResult, JsSuccess, JsValue, Reads}
 
 object SDESFileNotificationEnum extends Enumeration {
 
-  val FileReady:SDESFileNotificationEnum.Value = Value
-  val FileReceived:SDESFileNotificationEnum.Value = Value
-  val FileProcessingFailure:SDESFileNotificationEnum.Value = Value
-  val FileProcessed:SDESFileNotificationEnum.Value = Value
+  val FileReady: SDESFileNotificationEnum.Value = Value
+  val FileReceived: SDESFileNotificationEnum.Value = Value
+  val FileProcessingFailure: SDESFileNotificationEnum.Value = Value
+  val FileProcessed: SDESFileNotificationEnum.Value = Value
 
   implicit val format: Reads[SDESFileNotificationEnum.Value] = new Reads[SDESFileNotificationEnum.Value] {
 

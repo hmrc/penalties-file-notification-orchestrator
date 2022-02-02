@@ -59,7 +59,7 @@ class SDESCallbackSpec extends AnyWordSpec with Matchers {
       |        }
       |""".stripMargin)
 
-  val sdesCallBackModel:SDESCallback = SDESCallback(
+  val sdesCallBackModel: SDESCallback = SDESCallback(
     notification = SDESFileNotificationEnum.FileReady,
     filename = "axyz.doc",
     checksumAlgorithm = Some("MD5"),
@@ -72,7 +72,7 @@ class SDESCallbackSpec extends AnyWordSpec with Matchers {
                           Properties(name = "name2", value = "value2")))
   )
 
-  val sdesCallBackModelWithRequiredValues:SDESCallback = SDESCallback(
+  val sdesCallBackModelWithRequiredValues: SDESCallback = SDESCallback(
     notification = SDESFileNotificationEnum.FileReady,
     filename = "axyz.doc",
     checksumAlgorithm = None,
