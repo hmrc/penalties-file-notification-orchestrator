@@ -1,3 +1,5 @@
 # microservice specific routes
 
 POST        /new-notifications                    controllers.OrchestratorController.receiveSDESNotifications
+
+POST        /sdes-callback                        controllers.SDESCallbackController.handleCallback
