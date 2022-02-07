@@ -16,7 +16,7 @@
 
 package controllers
 
-import play.api.http.Status.{BAD_REQUEST, OK}
+import play.api.http.Status.{BAD_REQUEST, NO_CONTENT}
 import play.api.libs.json.{JsValue, Json}
 import play.api.libs.ws.WSResponse
 import play.api.test.Helpers.{await, defaultAwaitTimeout}
@@ -48,25 +48,25 @@ class SDESCallbackControllerISpec extends IntegrationSpecCommonBase{
   )
 
   "handleCallback" should {
-    "return OK (200)" when {
+    "return NO_CONTENT (204)" when {
       "sdesCallBack is a valid JSON" in {
-        val result: WSResponse = await(buildClientForRequestToApp(uri = "/sdes-callback ").post(
+        val result: WSResponse = await(buildClientForRequestToApp(uri = "/sdes-callback").post(
           sdesCallbackJson
         ))
-        result.status shouldBe OK
+        result.status shouldBe NO_CONTENT
       }
     }
 
     "return BAD_REQUEST (400)" when {
       "no JSON body is in the request" in {
-        val result: WSResponse = await(buildClientForRequestToApp(uri = "/sdes-callback ").post(
+        val result: WSResponse = await(buildClientForRequestToApp(uri = "/sdes-callback").post(
           ""
         ))
         result.status shouldBe BAD_REQUEST
       }
 
       "JSON body is present but it can not parsed to a model" in {
-        val result: WSResponse = await(buildClientForRequestToApp(uri = "/sdes-callback ").post(
+        val result: WSResponse = await(buildClientForRequestToApp(uri = "/sdes-callback").post(
           Json.parse("{}")
         ))
         result.status shouldBe BAD_REQUEST

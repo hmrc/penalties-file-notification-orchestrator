@@ -19,7 +19,7 @@ package controllers
 import base.SpecBase
 import models.{Properties, SDESCallback, SDESFileNotificationEnum}
 import org.mockito.Mockito.mock
-import play.api.http.Status.BAD_REQUEST
+import play.api.http.Status.{BAD_REQUEST, NO_CONTENT}
 import play.api.libs.json.{JsValue, Json}
 import play.api.mvc.Result
 import play.api.test.Helpers.{contentAsString, defaultAwaitTimeout, status, stubControllerComponents}
@@ -34,13 +34,20 @@ class SDESCallbackControllerSpec extends SpecBase {
   val mockService: AuditService = mock(classOf[AuditService])
 
   class Setup() {
-    val sdesController = new SDESCallbackController(mockService, stubControllerComponents())
+    val sdesCallbackController = new SDESCallbackController(mockService, stubControllerComponents())
   }
 
-  val sdesCallbackModel: SDESCallback = SDESCallback(SDESFileNotificationEnum.FileReady,"axyz.doc",Some("MD5"),Some("c6779ec2960296ed9a04f08d67f64422"), "545d0831-d4ba-408d-b1f1-f4645efb32fd",
-    Some(LocalDateTime.of(2021, 1, 6, 10, 1, 0).plus(889, ChronoUnit.MILLIS)),
-    Some("Virus Detected"), Some(LocalDateTime.of(2021, 1, 1, 10, 1, 0).plus(889, ChronoUnit.MILLIS)),
-    Some(Seq(Properties("name1","value1"))))
+  val sdesCallbackModel: SDESCallback = SDESCallback(
+      SDESFileNotificationEnum.FileReady,
+      "axyz.doc",
+      Some("MD5"),
+      Some("c6779ec2960296ed9a04f08d67f64422"),
+      "545d0831-d4ba-408d-b1f1-f4645efb32fd",
+      Some(LocalDateTime.of(2021, 1, 6, 10, 1, 0).plus(889, ChronoUnit.MILLIS)),
+      Some("Virus Detected"),
+      Some(LocalDateTime.of(2021, 1, 1, 10, 1, 0).plus(889, ChronoUnit.MILLIS)),
+      Some(Seq(Properties("name1", "value1")))
+    )
 
   val sdesCallbackJson: JsValue = Json.parse(
     s"""
@@ -66,14 +73,14 @@ class SDESCallbackControllerSpec extends SpecBase {
   "receiveSDESCallback" should {
     "return content string for Valid sdesCallback JSON Body" when {
       "the JSON request body is valid" in new Setup {
-        val result: Future[Result] = sdesController.handleCallback()(fakeRequest.withJsonBody(sdesCallbackJson))
-         contentAsString(result) shouldBe "Valid SDESCallback body"
+        val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(sdesCallbackJson))
+         status(result) shouldBe NO_CONTENT
       }
     }
 
     "return content string for Invalid sdesCallback JSON Body" when {
       "the JSON request body is invalid " in new Setup {
-        val result: Future[Result] = sdesController.handleCallback()(fakeRequest)
+        val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest)
         status(result) shouldBe BAD_REQUEST
         contentAsString(result) shouldBe "Invalid body received i.e. could not be parsed to JSON"
       }
@@ -96,7 +103,7 @@ class SDESCallbackControllerSpec extends SpecBase {
             |}]
             |""".stripMargin
         )
-        val result: Future[Result] = sdesController.handleCallback()(fakeRequest.withJsonBody(invalidBody))
+        val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(invalidBody))
         status(result) shouldBe BAD_REQUEST
         contentAsString(result) shouldBe "Failed to parse to model"
       }

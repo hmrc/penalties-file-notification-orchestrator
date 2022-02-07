@@ -42,13 +42,12 @@ class SDESCallbackController @Inject()(auditService: AuditService, cc: Controlle
             failure => {
               logger.error("[SDESCallbackController][handleCallback] Fail to parse request body to model")
               logger.debug(s"[SDESCallbackController][handleCallback] Parse failure(s): $failure")
-              println("Failure to parse..."+ failure)
               Future(BadRequest("Failed to parse to model"))
             },
             sdesCallback => {
               logger.info(s"[SDESCallbackController][handleCallback] Callback received from SDES with status ${sdesCallback.notification}. SDESCallback received  = $sdesCallback.toString")
               auditService.audit(FileNotificationStatusAuditModel(sdesCallback.notification, sdesCallback.filename, sdesCallback.correlationID, sdesCallback.failureReason, sdesCallback.availableUntil))
-              Future(Ok("Valid SDESCallback body"))
+              Future(NoContent)
             }
           )
         }

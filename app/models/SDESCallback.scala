@@ -36,25 +36,6 @@ case class Properties(name: String, value: String)
 
 object SDESCallback {
    val apiSDESCallbackReads: Reads[SDESCallback] = Json.reads[SDESCallback]
-  (json: JsValue) => {
-    for {
-      notification <- (json \ "notification").validate[SDESFileNotificationEnum.Value]
-      filename <- (json \ "filename").validate[String]
-      checksumAlgorithm <- (json \ "checksumAlgorithm").validate[String]
-      checksum <- (json \ "checksum").validate[String]
-      correlationID <- (json \ "correlationID").validate[String]
-      availableUntil <- (json \ "availableUntil").validate[LocalDateTime]
-      failureReason <- (json \ "failureReason").validate[String]
-      dateTime <- (json \ "dateTime").validate[LocalDateTime]
-      properties <-
-        (json \ "properties").validate[Properties](
-          Properties.formatProperties
-        )
-    } yield {
-      SDESCallback(notification, filename, Some(checksumAlgorithm), Some(checksum), correlationID,
-          Some(availableUntil), Some(failureReason), Some(dateTime), Some(Seq(properties)))
-    }
-  }
 }
 
 object Properties {
