@@ -16,7 +16,7 @@
 
 package models
 
-import play.api.libs.json.{Json, Reads}
+import play.api.libs.json.{JsValue, Json, Reads}
 
 import java.time.LocalDateTime
 
@@ -24,9 +24,9 @@ import java.time.LocalDateTime
 case class SDESCallback(
                          notification: SDESFileNotificationEnum.Value,
                          filename: String,
-                         correlationID: String,
                          checksumAlgorithm: Option[String],
                          checksum: Option[String],
+                         correlationID: String,
                          availableUntil: Option[LocalDateTime] = None,
                          failureReason: Option[String],
                          dateTime: Option[LocalDateTime] = None,
@@ -35,7 +35,7 @@ case class SDESCallback(
 case class Properties(name: String, value: String)
 
 object SDESCallback {
-  implicit val format: Reads[SDESCallback] = Json.reads[SDESCallback]
+   val apiSDESCallbackReads: Reads[SDESCallback] = Json.reads[SDESCallback]
 }
 
 object Properties {

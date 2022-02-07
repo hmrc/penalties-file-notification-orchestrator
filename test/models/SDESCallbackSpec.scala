@@ -85,13 +85,13 @@ class SDESCallbackSpec extends AnyWordSpec with Matchers {
   )
 
   "be readable from JSON" in {
-    val result = Json.fromJson(sdesCallbackJson)(SDESCallback.format)
+    val result = Json.fromJson(sdesCallbackJson)(SDESCallback.apiSDESCallbackReads)
     result.isSuccess shouldBe true
     result.get shouldBe sdesCallBackModel
   }
 
   "be readable from JSON when required values are provided" in {
-    val result = Json.fromJson(sdesCallbackJsonWithoutOptionalValues)(SDESCallback.format)
+    val result = Json.fromJson(sdesCallbackJsonWithoutOptionalValues)(SDESCallback.apiSDESCallbackReads)
     result.isSuccess shouldBe true
     result.get shouldBe sdesCallBackModelWithRequiredValues
   }
