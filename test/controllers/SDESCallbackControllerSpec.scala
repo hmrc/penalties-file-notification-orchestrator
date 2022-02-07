@@ -18,7 +18,8 @@ package controllers
 
 import base.SpecBase
 import models.{Properties, SDESCallback, SDESFileNotificationEnum}
-import org.mockito.Mockito.mock
+import org.mockito.ArgumentMatchers
+import org.mockito.Mockito.{mock, verify}
 import play.api.http.Status.{BAD_REQUEST, NO_CONTENT}
 import play.api.libs.json.{JsValue, Json}
 import play.api.mvc.Result
@@ -31,10 +32,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class SDESCallbackControllerSpec extends SpecBase {
-  val mockService: AuditService = mock(classOf[AuditService])
+  val mockAuditService: AuditService = mock(classOf[AuditService])
 
   class Setup() {
-    val sdesCallbackController = new SDESCallbackController(mockService, stubControllerComponents())
+    val sdesCallbackController = new SDESCallbackController(mockAuditService, stubControllerComponents())
   }
 
   val sdesCallbackModel: SDESCallback = SDESCallback(
@@ -74,7 +75,9 @@ class SDESCallbackControllerSpec extends SpecBase {
     "return content string for Valid sdesCallback JSON Body" when {
       "the JSON request body is valid" in new Setup {
         val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(sdesCallbackJson))
-         status(result) shouldBe NO_CONTENT
+        verify(mockAuditService)
+          .audit(ArgumentMatchers.any())(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any())
+        status(result) shouldBe NO_CONTENT
       }
     }
 
