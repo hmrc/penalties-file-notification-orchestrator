@@ -19,7 +19,7 @@ package services.monitoring
 import base.SpecBase
 import config.AppConfig
 import models.monitoring.JsonAuditModel
-import org.mockito.ArgumentMatchers
+import org.mockito.Matchers
 import org.mockito.Mockito._
 import play.api.libs.json._
 import play.api.test.FakeRequest
@@ -47,7 +47,7 @@ class AuditServiceSpec extends SpecBase with LogCapturing {
     reset(mockAuditConnector)
     val service = new AuditService(mockConfig, mockAuditConnector)
     when(mockConfig.appName).thenReturn("penalties-file-notification-orchestrator")
-    when(mockAuditConnector.sendExtendedEvent(ArgumentMatchers.any())(ArgumentMatchers.any(), ArgumentMatchers.any())).thenReturn(Future.successful(AuditResult.Success))
+    when(mockAuditConnector.sendExtendedEvent(Matchers.any())(Matchers.any(), Matchers.any())).thenReturn(Future.successful(AuditResult.Success))
   }
 
   "audit" should {
@@ -55,9 +55,9 @@ class AuditServiceSpec extends SpecBase with LogCapturing {
       val expectedData = service.toExtendedDataEvent(jsonAuditModel, "testUrl")
       service.audit(jsonAuditModel)(implicitly, implicitly, FakeRequest("POST", "testUrl"))
       verify(mockAuditConnector)
-        .sendExtendedEvent(ArgumentMatchers.refEq(expectedData, "eventId", "generatedAt"))(
-          ArgumentMatchers.any[HeaderCarrier],
-          ArgumentMatchers.any[ExecutionContext]
+        .sendExtendedEvent(Matchers.refEq(expectedData, "eventId", "generatedAt"))(
+          Matchers.any[HeaderCarrier],
+          Matchers.any[ExecutionContext]
         )
     }
   }

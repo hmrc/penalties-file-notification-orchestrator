@@ -22,7 +22,7 @@ import models.FailedJobResponses.{FailedToProcessNotifications, UnknownProcessin
 import models.SDESNotificationRecord
 import models.notification.{RecordStatusEnum, SDESAudit, SDESChecksum, SDESNotification, SDESNotificationFile, SDESProperties}
 import org.joda.time.Duration
-import org.mockito.ArgumentMatchers
+import org.mockito.Matchers
 import org.mockito.Mockito._
 import play.api.Configuration
 import play.api.test.Helpers._
@@ -77,15 +77,15 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
     reset(mockLockRepository, mockLockRepositoryProvider, mockConfig, mockSDESConnector, mockFileNotificationRepository, mockTimeMachine, mockSDESConnector)
     val service = new SendFileNotificationsToSDESService(mockLockRepositoryProvider, mockFileNotificationRepository, mockSDESConnector, mockTimeMachine, mockConfig)
 
-    when(mockConfig.get[Int](ArgumentMatchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(ArgumentMatchers.any()))
+    when(mockConfig.get[Int](Matchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(Matchers.any()))
       .thenReturn(mongoLockTimeout)
     when(mockTimeMachine.now).thenReturn(mockDateTime)
 
     if (withMongoLockStubs) {
       when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
+      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
-      when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
+      when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.successful(()))
     }
   }
@@ -100,46 +100,46 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
 
     "process the notifications and return Right if they all succeed - only process PENDING notifications where nextAttemptAt <= now" in new Setup {
       when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotifications))
-      when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any())).thenReturn(Future.successful(
+      when(mockFileNotificationRepository.updateFileNotification(Matchers.any())).thenReturn(Future.successful(
         notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = LocalDateTime.now())
       ))
-      when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
+      when(mockSDESConnector.sendNotificationToSDES(Matchers.any())(Matchers.any()))
         .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
       val result = await(service.invoke)
       result.isRight shouldBe true
       result.right.get shouldBe "Processed all notifications"
-      verify(mockSDESConnector, times(2)).sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any())
-      verify(mockFileNotificationRepository, times(2)).updateFileNotification(ArgumentMatchers.any())
+      verify(mockSDESConnector, times(2)).sendNotificationToSDES(Matchers.any())(Matchers.any())
+      verify(mockFileNotificationRepository, times(2)).updateFileNotification(Matchers.any())
     }
 
     "process the notifications and return Left if some fail" in new Setup {
       when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotifications))
-      when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any())).thenReturn(Future.successful(
+      when(mockFileNotificationRepository.updateFileNotification(Matchers.any())).thenReturn(Future.successful(
         notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = LocalDateTime.now())
       ))
-      when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
+      when(mockSDESConnector.sendNotificationToSDES(Matchers.any())(Matchers.any()))
         .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
         .thenReturn(Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
       val result = await(service.invoke)
       result.isLeft shouldBe true
       result.left.get shouldBe FailedToProcessNotifications
-      verify(mockSDESConnector, times(2)).sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any())
+      verify(mockSDESConnector, times(2)).sendNotificationToSDES(Matchers.any())(Matchers.any())
       val updatedNotificationRecordSent: SDESNotificationRecord = notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = mockDateTime)
       val updatedNotificationRecordPending: SDESNotificationRecord = notificationRecord.copy(status = RecordStatusEnum.PENDING, updatedAt = mockDateTime, numberOfAttempts = 2, nextAttemptAt = mockDateTime.plusMinutes(30).minusSeconds(1))
-      verify(mockFileNotificationRepository, times(1)).updateFileNotification(ArgumentMatchers.eq(updatedNotificationRecordSent))
-      verify(mockFileNotificationRepository, times(1)).updateFileNotification(ArgumentMatchers.eq(updatedNotificationRecordPending))
+      verify(mockFileNotificationRepository, times(1)).updateFileNotification(Matchers.eq(updatedNotificationRecordSent))
+      verify(mockFileNotificationRepository, times(1)).updateFileNotification(Matchers.eq(updatedNotificationRecordPending))
     }
 
     "process the notifications and return Left if all fail" in new Setup {
       when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotifications))
-      when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
+      when(mockSDESConnector.sendNotificationToSDES(Matchers.any())(Matchers.any()))
         .thenReturn(Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
-      when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any()))
+      when(mockFileNotificationRepository.updateFileNotification(Matchers.any()))
         .thenReturn(Future.successful(notificationRecord))
       val result = await(service.invoke)
       result.isLeft shouldBe true
       result.left.get shouldBe FailedToProcessNotifications
-      verify(mockFileNotificationRepository, times(2)).updateFileNotification(ArgumentMatchers.any())
+      verify(mockFileNotificationRepository, times(2)).updateFileNotification(Matchers.any())
 
     }
 
@@ -151,9 +151,9 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         val notificationRecordAsPermanentFailure: SDESNotificationRecord = notificationRecord.copy(numberOfAttempts = 5,
           status = RecordStatusEnum.PERMANENT_FAILURE, updatedAt = mockDateTime)
         when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(notificationsToSend))
-        when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
+        when(mockSDESConnector.sendNotificationToSDES(Matchers.any())(Matchers.any()))
           .thenReturn(Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
-        when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.eq(notificationRecordAsPermanentFailure)))
+        when(mockFileNotificationRepository.updateFileNotification(Matchers.eq(notificationRecordAsPermanentFailure)))
           .thenReturn(Future.successful(notificationRecordAsPermanentFailure))
         val result = await(service.invoke)
         result.isLeft shouldBe true
@@ -167,9 +167,9 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         val notificationRecordAsPermanentFailure: SDESNotificationRecord = notificationRecord.copy(status = RecordStatusEnum.PERMANENT_FAILURE,
           updatedAt = mockDateTime)
         when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(notificationsToSend))
-        when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
+        when(mockSDESConnector.sendNotificationToSDES(Matchers.any())(Matchers.any()))
           .thenReturn(Future.successful(HttpResponse(BAD_REQUEST, "")))
-        when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.eq(notificationRecordAsPermanentFailure)))
+        when(mockFileNotificationRepository.updateFileNotification(Matchers.eq(notificationRecordAsPermanentFailure)))
           .thenReturn(Future.successful(notificationRecordAsPermanentFailure))
         val result = await(service.invoke)
         result.isLeft shouldBe true
@@ -183,9 +183,9 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         val notificationRecordAsPermanentFailure: SDESNotificationRecord = notificationRecord.copy(status = RecordStatusEnum.PERMANENT_FAILURE,
           updatedAt = mockDateTime)
         when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(notificationsToSend))
-        when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
+        when(mockSDESConnector.sendNotificationToSDES(Matchers.any())(Matchers.any()))
           .thenReturn(Future.failed(new Exception("i broke")))
-        when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.eq(notificationRecordAsPermanentFailure)))
+        when(mockFileNotificationRepository.updateFileNotification(Matchers.eq(notificationRecordAsPermanentFailure)))
           .thenReturn(Future.successful(notificationRecordAsPermanentFailure))
         val result = await(service.invoke)
         result.isLeft shouldBe true
@@ -200,9 +200,9 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
       val notificationRecordIncreasedAttempt: SDESNotificationRecord = notificationRecord.copy(numberOfAttempts = 2, status = RecordStatusEnum.PENDING,
         nextAttemptAt = mockDateTime.plusMinutes(30))
       when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(notificationsToSend))
-      when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
+      when(mockSDESConnector.sendNotificationToSDES(Matchers.any())(Matchers.any()))
         .thenReturn(Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
-      when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.eq(notificationRecordIncreasedAttempt)))
+      when(mockFileNotificationRepository.updateFileNotification(Matchers.eq(notificationRecordIncreasedAttempt)))
         .thenReturn(Future.successful(notificationRecordIncreasedAttempt))
       val result = await(service.invoke)
       result.isLeft shouldBe true
@@ -221,19 +221,19 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
     "return a Future successful when lockRepository is able to lock and unlock successfully" in new Setup {
       val expectingResult = Future.successful(Right(""))
       when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
+      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
-      when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
+      when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.successful(()))
       await(service.tryLock(expectingResult)) shouldBe Right("")
-      verify(mockLockRepository, times(1)).lock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration))
-      verify(mockLockRepository, times(1)).releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any())
+      verify(mockLockRepository, times(1)).lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
 
     s"return a $Right ${Seq.empty} if lock returns Future.successful (false)" in new Setup {
       val expectingResult = Future.successful(Right(""))
       when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
+      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.successful(false))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Right(s"$jobName - JobAlreadyRunning")
@@ -242,41 +242,41 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Locked because it might be running on another instance") shouldBe true
       }
 
-      verify(mockLockRepository, times(1)).lock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration))
-      verify(mockLockRepository, times(0)).releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any())
+      verify(mockLockRepository, times(1)).lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
+      verify(mockLockRepository, times(0)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and succeeds" in new Setup {
       val expectingResult = Future.successful(Right(""))
       val exception = new Exception("woopsy")
       when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
+      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
-      when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
+      when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.successful(()))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
       }
 
-      verify(mockLockRepository, times(1)).lock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration))
-      verify(mockLockRepository, times(1)).releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any())
+      verify(mockLockRepository, times(1)).lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and failed also" in new Setup {
       val expectingResult = Future.successful(Right(""))
       val exception = new Exception("not again")
       when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
+      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
-      when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
+      when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.failed(exception))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
       }
-      verify(mockLockRepository, times(1)).lock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration))
-      verify(mockLockRepository, times(1)).releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any())
+      verify(mockLockRepository, times(1)).lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
   }
 
