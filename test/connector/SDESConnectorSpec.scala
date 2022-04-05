@@ -19,8 +19,8 @@ package connector
 import base.SpecBase
 import config.AppConfig
 import connectors.SDESConnector
-import models.notification.{SDESAudit, SDESChecksum, SDESNotification, SDESNotificationFile, SDESProperties}
-import org.mockito.ArgumentMatchers
+import models.notification._
+import org.mockito.Matchers
 import org.mockito.Mockito._
 import play.api.test.Helpers._
 import uk.gov.hmrc.http.{HttpClient, HttpResponse}
@@ -46,9 +46,9 @@ class SDESConnectorSpec extends SpecBase {
   "sendNotificationsToSDES" should {
     "post the notification to the app config value and return the result" in new Setup {
       when(mockAppConfig.sdesUrl).thenReturn("stub/notifications/fileready")
-      when(mockHttpClient.POST[SDESNotification, HttpResponse](ArgumentMatchers.eq("stub/notifications/fileready"), ArgumentMatchers.any(),
-        ArgumentMatchers.any())(ArgumentMatchers.any(),
-        ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+      when(mockHttpClient.POST[SDESNotification, HttpResponse](Matchers.eq("stub/notifications/fileready"), Matchers.any(),
+        Matchers.any())(Matchers.any(),
+        Matchers.any(), Matchers.any(), Matchers.any()))
         .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
       val result = await(connector.sendNotificationToSDES(notification))
       result.status shouldBe NO_CONTENT

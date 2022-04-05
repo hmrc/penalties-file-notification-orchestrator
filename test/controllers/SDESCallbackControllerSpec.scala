@@ -18,7 +18,7 @@ package controllers
 
 import base.SpecBase
 import models.{Properties, SDESCallback, SDESFileNotificationEnum}
-import org.mockito.ArgumentMatchers
+import org.mockito.Matchers
 import org.mockito.Mockito.{mock, verify}
 import play.api.http.Status.{BAD_REQUEST, NO_CONTENT}
 import play.api.libs.json.{JsValue, Json}
@@ -76,7 +76,7 @@ class SDESCallbackControllerSpec extends SpecBase {
       "the JSON request body is valid" in new Setup {
         val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(sdesCallbackJson))
         verify(mockAuditService)
-          .audit(ArgumentMatchers.any())(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any())
+          .audit(Matchers.any())(Matchers.any(), Matchers.any(), Matchers.any())
         status(result) shouldBe NO_CONTENT
       }
     }

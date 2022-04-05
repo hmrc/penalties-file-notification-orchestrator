@@ -18,7 +18,7 @@ package services
 
 import base.SpecBase
 import models.notification.{SDESAudit, SDESChecksum, SDESNotification, SDESNotificationFile, SDESProperties}
-import org.mockito.ArgumentMatchers
+import org.mockito.Matchers
 import org.mockito.Mockito.{mock, reset, when}
 import play.api.test.Helpers.{await, defaultAwaitTimeout}
 import repositories.FileNotificationRepository
@@ -62,13 +62,13 @@ class NotificationMongoServiceSpec extends SpecBase {
 
   "insertNotificationRecordsIntoMongo" should {
     "call the repository and return true when successfully inserted" in new Setup {
-      when(mockRepo.insertFileNotifications(ArgumentMatchers.any())).thenReturn(Future.successful(true))
+      when(mockRepo.insertFileNotifications(Matchers.any())).thenReturn(Future.successful(true))
       val result: Boolean = await(service.insertNotificationRecordsIntoMongo(seqToPassToService))
       result shouldBe true
     }
 
     "call the repository and return false when unsuccessful" in new Setup {
-      when(mockRepo.insertFileNotifications(ArgumentMatchers.any())).thenReturn(Future.successful(false))
+      when(mockRepo.insertFileNotifications(Matchers.any())).thenReturn(Future.successful(false))
       val result: Boolean = await(service.insertNotificationRecordsIntoMongo(seqToPassToService))
       result shouldBe false
     }
