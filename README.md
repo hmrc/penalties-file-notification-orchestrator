@@ -8,7 +8,7 @@ new-notifications is a new notification service for backend services.
 
 
 POST        /sdes-callback                        controllers.SDESCallbackController.handleCallback
-sde will pull fromm file upload, process the file and message is sent back with the status.
+sde will pull from file upload, process the file and message is sent back with the status.
 
 
 ## Running
