@@ -6,12 +6,11 @@ This service accepts notifications to be sent to downstream services and process
 The service has 2 endpoints
 
 POST        /new-notifications                    controllers.OrchestratorController.receiveSDESNotifications
-new notifications is a new notification service for backend services.
 This endpoint accepts new notifications to be processed by the batch job and sent to SDES.
 
 
 POST        /sdes-callback                        controllers.SDESCallbackController.handleCallback
-SDE will pull from file upload, process the file and message is sent back with the status.
+SDES will pull from file upload, process the file and message is sent back with the status.
 
 
 ## Running
@@ -19,8 +18,6 @@ SDE will pull from file upload, process the file and message is sent back with t
 This application runs on port 9184.
 
 You can use the ./run.sh to run the service.
-
-The user must have an authenticated session and be enrolled in MTD VAT to access most pages of this service.
 
 The service manager configuration name for this service is: PENALTIES_FILE_NOTIFICATION_ORCHESTRATOR
 
