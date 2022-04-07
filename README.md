@@ -1,7 +1,6 @@
 
 # Penalties File Notification Orchestrator
 
-PENALTIES FILE NOTIFICATION ORCHESTRATOR
 This service accepts notifications to be sent to downstream services and processes batches of notifications at timed intervals, whilst handling the processing outcome of those notifications via callbacks.
 
 The service has 2 endpoints
