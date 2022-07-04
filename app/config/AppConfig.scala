@@ -29,6 +29,8 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
 
   lazy val useStubForSDESCall: Boolean = config.get[Boolean]("feature-switch.useStubForSDESCall")
 
+  lazy val urlHeaderAuthorisation: String = s"Bearer ${config.get[String](" sdes.outboundBearerToken")}"
+
   private val sdesBaseUrl: String = {
     if (useStubForSDESCall) servicesConfig.baseUrl("penalties-stub") + "/penalties-stub"
     else servicesConfig.baseUrl("sdes")
