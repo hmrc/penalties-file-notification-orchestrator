@@ -18,9 +18,9 @@ package connectors
 
 import config.AppConfig
 import models.notification.SDESNotification
-import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpResponse}
-
+import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpClient, HttpResponse}
 import javax.inject.Inject
+
 import scala.concurrent.{ExecutionContext, Future}
 import uk.gov.hmrc.http.HttpReads.Implicits._
 
@@ -28,7 +28,7 @@ class SDESConnector @Inject()(config: AppConfig,
                               httpClient: HttpClient) {
 
   def sendNotificationToSDES(notification: SDESNotification)(implicit ec: ExecutionContext): Future[HttpResponse] = {
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    implicit val headerCarrier: HeaderCarrier = HeaderCarrier(authorization = Some(Authorization(config.urlHeaderAuthorisation)))
     httpClient.POST[SDESNotification, HttpResponse](config.sdesUrl, notification)
   }
 }

@@ -20,10 +20,10 @@ import base.SpecBase
 import config.AppConfig
 import connectors.SDESConnector
 import models.notification._
-import org.mockito.Matchers
+import org.mockito.{ArgumentCaptor, Matchers}
 import org.mockito.Mockito._
 import play.api.test.Helpers._
-import uk.gov.hmrc.http.{HttpClient, HttpResponse}
+import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpClient, HttpResponse}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -46,12 +46,19 @@ class SDESConnectorSpec extends SpecBase {
   "sendNotificationsToSDES" should {
     "post the notification to the app config value and return the result" in new Setup {
       when(mockAppConfig.sdesUrl).thenReturn("stub/notifications/fileready")
-      when(mockHttpClient.POST[SDESNotification, HttpResponse](Matchers.eq("stub/notifications/fileready"), Matchers.any(),
-        Matchers.any())(Matchers.any(),
-        Matchers.any(), Matchers.any(), Matchers.any()))
+      when(mockAppConfig.urlHeaderAuthorisation).thenReturn("Bearer 12345")
+      val hcArgumentCaptor: ArgumentCaptor[HeaderCarrier] = ArgumentCaptor.forClass(classOf[HeaderCarrier])
+      when(mockHttpClient.POST[SDESNotification, HttpResponse](Matchers.eq("stub/notifications/fileready"),
+        Matchers.any(),
+        Matchers.any())
+        (Matchers.any(),
+          Matchers.any(),
+          hcArgumentCaptor.capture(),
+          Matchers.any()))
         .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
-      val result = await(connector.sendNotificationToSDES(notification))
+      val result: HttpResponse = await(connector.sendNotificationToSDES(notification))
       result.status shouldBe NO_CONTENT
+      hcArgumentCaptor.getValue.authorization shouldBe Some(Authorization("Bearer 12345"))
     }
   }
 }
