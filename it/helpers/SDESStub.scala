@@ -21,13 +21,13 @@ import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import play.api.http.Status._
 
 object SDESStub {
-  def successfulStubResponse(): StubMapping = stubFor(post(urlEqualTo("/penalties-stub/notification/fileready")).willReturn(
+  def successfulStubResponse(): StubMapping = stubFor(post(urlEqualTo("/penalties-stub/notification/files/transfer/ready/123456789")).willReturn(
     aResponse()
       .withStatus(NO_CONTENT)
       .withBody("")
   ))
 
-  def failedStubResponse(statusCode: Int): StubMapping = stubFor(post(urlEqualTo("/penalties-stub/notification/fileready")).willReturn(
+  def failedStubResponse(statusCode: Int): StubMapping = stubFor(post(urlEqualTo("/penalties-stub/notification/files/transfer/ready/123456789")).willReturn(
     aResponse()
       .withStatus(statusCode)
       .withBody("")

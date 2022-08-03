@@ -29,14 +29,14 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
 
   lazy val useStubForSDESCall: Boolean = config.get[Boolean]("feature-switch.useStubForSDESCall")
 
-  lazy val urlHeaderAuthorisation: String = s"Bearer ${config.get[String](" sdes.outboundBearerToken")}"
+  lazy val urlHeaderAuthorisation: String = s"Bearer ${config.get[String]("sdes.outboundBearerToken")}"
 
   private val sdesBaseUrl: String = {
     if (useStubForSDESCall) servicesConfig.baseUrl("penalties-stub") + "/penalties-stub"
     else servicesConfig.baseUrl("sdes")
   }
 
-  val sdesUrl: String = sdesBaseUrl + "/notification/fileready"
+  val sdesUrl: String = sdesBaseUrl + s"/notification/files/transfer/ready/${config.get[String]("sdes.srn")}"
 
   val auditingEnabled: Boolean = config.get[Boolean]("auditing.enabled")
   val graphiteHost: String     = config.get[String]("microservice.metrics.graphite.host")

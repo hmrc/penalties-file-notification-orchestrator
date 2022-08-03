@@ -24,6 +24,7 @@ trait WiremockHelper {
 
   val stubPort = 11111
   val stubHost = "localhost"
+  val stubSRN = "123456789"
 
   var wireMockServer: WireMockServer = new WireMockServer(wireMockConfig().port(stubPort))
 
