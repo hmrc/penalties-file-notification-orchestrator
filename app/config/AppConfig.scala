@@ -30,7 +30,7 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
 
   lazy val useStubForSDESCall: Boolean = config.get[Boolean]("feature-switch.useStubForSDESCall")
 
-  lazy val urlHeaderAuthorisation: String = s"Bearer ${config.get[String]("sdes.outboundBearerToken")}"
+  lazy val urlHeaderAuthorisation: String = config.get[String]("sdes.outboundBearerToken")
 
   lazy val srn: String = config.get[String]("sdes.srn")
 
