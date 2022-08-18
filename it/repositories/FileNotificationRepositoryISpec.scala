@@ -16,8 +16,6 @@
 
 package repositories
 
-import java.time.LocalDateTime
-
 import models.SDESNotificationRecord
 import models.notification._
 import org.mongodb.scala.bson.collection.immutable.Document
@@ -27,6 +25,7 @@ import play.api.test.Helpers._
 import services.NotificationMongoService
 import utils.IntegrationSpecCommonBase
 
+import java.time.LocalDateTime
 import scala.concurrent.Future
 
 class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {

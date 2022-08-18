@@ -16,19 +16,21 @@
 
 package services
 
-import org.joda.time.Duration
+import models.MongoLockResponses
 import play.api.Configuration
-import repositories.{FileNotificationRepository, LockRepositoryProvider, MongoLockResponses}
+import repositories.FileNotificationRepository
 import scheduler.{ScheduleStatus, ScheduledService}
-import uk.gov.hmrc.lock.{LockKeeper, LockRepository}
 import utils.Logger.logger
+
 import javax.inject.Inject
 import models.notification.RecordStatusEnum
+import uk.gov.hmrc.mongo.lock.{LockRepository, LockService, MongoLockRepository}
 
+import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
 
 class MonitoringJobService @Inject()(
-                                      lockRepositoryProvider: LockRepositoryProvider,
+                                      lockRepositoryProvider: MongoLockRepository,
                                       config: Configuration,
                                       repository: FileNotificationRepository
                                     )(implicit ec: ExecutionContext) extends ScheduledService[Either[ScheduleStatus.JobFailed, Seq[String]]] {
@@ -36,10 +38,10 @@ class MonitoringJobService @Inject()(
   val jobName = "MonitoringJob"
   lazy val mongoLockTimeoutSeconds: Int = config.get[Int](s"schedules.$jobName.mongoLockTimeout")
 
-  lazy val lockKeeper: LockKeeper = new LockKeeper() {
+  lazy val lockKeeper: LockService = new LockService() {
     override val lockId = s"schedules.$jobName"
-    override val forceLockReleaseAfter: Duration = Duration.standardSeconds(mongoLockTimeoutSeconds)
-    override lazy val repo: LockRepository = lockRepositoryProvider.repo
+    override val ttl: Duration = mongoLockTimeoutSeconds.seconds
+    override val lockRepository: LockRepository = lockRepositoryProvider
   }
 
   override def invoke: Future[Either[ScheduleStatus.JobFailed, Seq[String]]] = {
@@ -61,7 +63,7 @@ class MonitoringJobService @Inject()(
   }
 
   def tryLock(f: => Future[Either[ScheduleStatus.JobFailed, Seq[String]]]): Future[Either[ScheduleStatus.JobFailed, Seq[String]]] = {
-    lockKeeper.tryLock(f).map {
+    lockKeeper.withLock(f).map {
       case Some(result) => result
       case None =>
         logger.info(s"[$jobName] Locked because it might be running on another instance")

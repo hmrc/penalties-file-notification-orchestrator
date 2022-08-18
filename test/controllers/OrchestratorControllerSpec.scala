@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package controller
+package controllers
 
 import base.SpecBase
 import config.AppConfig
-import controllers.OrchestratorController
 import models.notification._
 import org.mockito.Mockito.{mock, reset, when}
 import play.api.libs.json.{JsValue, Json}

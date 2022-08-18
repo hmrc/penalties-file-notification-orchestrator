@@ -16,7 +16,7 @@
 
 package models
 
-import play.api.libs.json.{JsValue, Json, Reads}
+import play.api.libs.json.{Json, Reads}
 
 import java.time.LocalDateTime
 

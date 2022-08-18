@@ -19,26 +19,25 @@ package services
 import base.SpecBase
 import connectors.SDESConnector
 import models.FailedJobResponses.{FailedToProcessNotifications, UnknownProcessingException}
-import models.SDESNotificationRecord
-import models.notification.{RecordStatusEnum, SDESAudit, SDESChecksum, SDESNotification, SDESNotificationFile, SDESProperties}
-import org.joda.time.Duration
+import models.notification._
+import models.{MongoLockResponses, SDESNotificationRecord}
 import org.mockito.Matchers
 import org.mockito.Mockito._
 import play.api.Configuration
 import play.api.test.Helpers._
-import repositories.{FileNotificationRepository, LockRepositoryProvider, MongoLockResponses}
+import repositories.FileNotificationRepository
 import uk.gov.hmrc.http.HttpResponse
-import uk.gov.hmrc.lock.LockRepository
-import utils.{LogCapturing, TimeMachine}
+import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.Logger.logger
+import utils.{LogCapturing, TimeMachine}
 
 import java.time.LocalDateTime
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration.{Duration, DurationInt}
 
 class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing {
-  val mockLockRepositoryProvider: LockRepositoryProvider = mock(classOf[LockRepositoryProvider])
-  val mockLockRepository: LockRepository = mock(classOf[LockRepository])
+  val mockLockRepository: MongoLockRepository = mock(classOf[MongoLockRepository])
   val mockSDESConnector: SDESConnector = mock(classOf[SDESConnector])
   val mockConfig: Configuration = mock(classOf[Configuration])
   val mockTimeMachine: TimeMachine = mock(classOf[TimeMachine])
@@ -47,7 +46,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
 
   val mongoLockId: String = s"schedules.$jobName"
   val mongoLockTimeout: Int = 123
-  val releaseDuration: Duration = Duration.standardSeconds(mongoLockTimeout)
+  val releaseDuration: Duration = mongoLockTimeout.seconds
 
   val mockDateTime: LocalDateTime = LocalDateTime.of(2022, 1, 1, 0, 0, 0)
   val notification1: SDESNotification = SDESNotification(informationType = "info",
@@ -74,16 +73,15 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
   )
 
   class Setup(withMongoLockStubs: Boolean = true) {
-    reset(mockLockRepository, mockLockRepositoryProvider, mockConfig, mockSDESConnector, mockFileNotificationRepository, mockTimeMachine, mockSDESConnector)
-    val service = new SendFileNotificationsToSDESService(mockLockRepositoryProvider, mockFileNotificationRepository, mockSDESConnector, mockTimeMachine, mockConfig)
+    reset(mockLockRepository, mockConfig, mockSDESConnector, mockFileNotificationRepository, mockTimeMachine, mockSDESConnector)
+    val service = new SendFileNotificationsToSDESService(mockLockRepository, mockFileNotificationRepository, mockSDESConnector, mockTimeMachine, mockConfig)
 
     when(mockConfig.get[Int](Matchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(Matchers.any()))
       .thenReturn(mongoLockTimeout)
     when(mockTimeMachine.now).thenReturn(mockDateTime)
 
     if (withMongoLockStubs) {
-      when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
       when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.successful(()))
@@ -220,20 +218,18 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
   "tryLock" should {
     "return a Future successful when lockRepository is able to lock and unlock successfully" in new Setup {
       val expectingResult = Future.successful(Right(""))
-      when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
       when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.successful(()))
       await(service.tryLock(expectingResult)) shouldBe Right("")
-      verify(mockLockRepository, times(1)).lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
 
     s"return a $Right ${Seq.empty} if lock returns Future.successful (false)" in new Setup {
       val expectingResult = Future.successful(Right(""))
-      when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.successful(false))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Right(s"$jobName - JobAlreadyRunning")
@@ -242,15 +238,14 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Locked because it might be running on another instance") shouldBe true
       }
 
-      verify(mockLockRepository, times(1)).lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(0)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and succeeds" in new Setup {
       val expectingResult = Future.successful(Right(""))
       val exception = new Exception("woopsy")
-      when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
       when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.successful(()))
@@ -259,15 +254,14 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
       }
 
-      verify(mockLockRepository, times(1)).lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and failed also" in new Setup {
       val expectingResult = Future.successful(Right(""))
       val exception = new Exception("not again")
-      when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
       when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.failed(exception))
@@ -275,7 +269,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
       }
-      verify(mockLockRepository, times(1)).lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
   }
