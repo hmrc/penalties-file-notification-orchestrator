@@ -17,7 +17,7 @@
 package services
 
 import base.SpecBase
-import models.notification.{SDESAudit, SDESChecksum, SDESNotification, SDESNotificationFile, SDESProperties}
+import models.notification._
 import org.mockito.Matchers
 import org.mockito.Mockito.{mock, reset, when}
 import play.api.test.Helpers.{await, defaultAwaitTimeout}

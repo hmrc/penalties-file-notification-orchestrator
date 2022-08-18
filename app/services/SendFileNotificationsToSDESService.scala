@@ -18,23 +18,23 @@ package services
 
 import connectors.SDESConnector
 import models.FailedJobResponses.{FailedToProcessNotifications, UnknownProcessingException}
-import models.SDESNotificationRecord
+import models.{MongoLockResponses, SDESNotificationRecord}
 import models.notification.{RecordStatusEnum, SDESNotification}
-import org.joda.time.Duration
 import play.api.Configuration
 import play.api.http.Status.NO_CONTENT
-import repositories.{FileNotificationRepository, LockRepositoryProvider, MongoLockResponses}
+import repositories.FileNotificationRepository
 import scheduler.{ScheduleStatus, ScheduledService}
-import uk.gov.hmrc.lock.LockKeeper
+import uk.gov.hmrc.mongo.lock.{LockRepository, LockService, MongoLockRepository}
 import utils.Logger.logger
 import utils.TimeMachine
 
 import java.time.LocalDateTime
 import javax.inject.Inject
+import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
 
 class SendFileNotificationsToSDESService @Inject()(
-                                                    lockRepositoryProvider: LockRepositoryProvider,
+                                                    lockRepositoryProvider: MongoLockRepository,
                                                     fileNotificationRepository: FileNotificationRepository,
                                                     sdesConnector: SDESConnector,
                                                     timeMachine: TimeMachine,
@@ -44,10 +44,10 @@ class SendFileNotificationsToSDESService @Inject()(
   val jobName = "SendFileNotificationsToSDESJob"
   lazy val mongoLockTimeoutSeconds: Int = config.get[Int](s"schedules.$jobName.mongoLockTimeout")
 
-  lazy val lockKeeper: LockKeeper = new LockKeeper() {
+  lazy val lockKeeper: LockService = new LockService() {
     override val lockId = s"schedules.$jobName"
-    override val forceLockReleaseAfter: Duration = Duration.standardSeconds(mongoLockTimeoutSeconds)
-    override lazy val repo = lockRepositoryProvider.repo
+    override val ttl: Duration = mongoLockTimeoutSeconds.seconds
+    override val lockRepository: LockRepository = lockRepositoryProvider
   }
 
   //scalastyle:off
@@ -113,7 +113,7 @@ class SendFileNotificationsToSDESService @Inject()(
   }
 
   def tryLock(f: => Future[Either[ScheduleStatus.JobFailed, String]]): Future[Either[ScheduleStatus.JobFailed, String]] = {
-    lockKeeper.tryLock(f).map {
+    lockKeeper.withLock(f).map {
       case Some(result) => result
       case None =>
         logger.info(s"[$jobName] Locked because it might be running on another instance")

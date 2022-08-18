@@ -17,41 +17,40 @@
 package services
 
 import base.SpecBase
+import models.MongoLockResponses
 import models.notification.RecordStatusEnum
-import org.joda.time.Duration
 import org.mockito.Matchers
-import org.mockito.Mockito.{mock, reset, times, verify, when}
+import org.mockito.Mockito._
 import play.api.Configuration
 import play.api.test.Helpers._
-import repositories.{FileNotificationRepository, LockRepositoryProvider, MongoLockResponses}
-import uk.gov.hmrc.lock.LockRepository
+import repositories.FileNotificationRepository
+import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.LogCapturing
 import utils.Logger.logger
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration.{Duration, DurationInt}
 
 class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
-  val mockLockRepositoryProvider: LockRepositoryProvider = mock(classOf[LockRepositoryProvider])
-  val mockLockRepository: LockRepository = mock(classOf[LockRepository])
+  val mockLockRepository: MongoLockRepository = mock(classOf[MongoLockRepository])
   val mockConfig: Configuration = mock(classOf[Configuration])
   val mockRepo: FileNotificationRepository = mock(classOf[FileNotificationRepository])
   val jobName = "MonitoringJob"
 
   val mongoLockId: String = s"schedules.$jobName"
   val mongoLockTimeout: Int = 123
-  val releaseDuration: Duration = Duration.standardSeconds(mongoLockTimeout)
+  val releaseDuration: Duration = mongoLockTimeout.seconds
 
   class Setup(withMongoLockStubs: Boolean = true) {
-    reset(mockLockRepository, mockLockRepositoryProvider, mockConfig, mockRepo)
-    val service = new MonitoringJobService(mockLockRepositoryProvider, mockConfig, mockRepo)
+    reset(mockLockRepository, mockLockRepository, mockConfig, mockRepo)
+    val service = new MonitoringJobService(mockLockRepository, mockConfig, mockRepo)
 
     when(mockConfig.get[Int](Matchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(Matchers.any()))
       .thenReturn(mongoLockTimeout)
 
     if (withMongoLockStubs) {
-      when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
       when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.successful(()))
@@ -84,22 +83,20 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
   "tryLock" should {
     "return a Future successful when lockRepository is able to lock and unlock successfully" in new Setup {
       val expectingResult: Future[Right[Nothing, Seq[Nothing]]] = Future.successful(Right(Seq.empty))
-      when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
       when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.successful(()))
 
       await(service.tryLock(expectingResult)) shouldBe Right(Seq.empty)
 
-      verify(mockLockRepository, times(1)).lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
 
     s"return a $Right ${Seq.empty} if lock returns Future.successful (false)" in new Setup {
       val expectingResult = Future.successful(Right(Seq.empty))
-      when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.successful(false))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Right(Seq(s"$jobName - JobAlreadyRunning"))
@@ -108,15 +105,14 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Locked because it might be running on another instance") shouldBe true
       }
 
-      verify(mockLockRepository, times(1)).lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(0)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and succeeds" in new Setup {
       val expectingResult = Future.successful(Right(Seq.empty))
       val exception = new Exception("woopsy")
-      when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
       when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.successful(()))
@@ -125,15 +121,14 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
       }
 
-      verify(mockLockRepository, times(1)).lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and failed also" in new Setup {
       val expectingResult = Future.successful(Right(Seq.empty))
       val exception = new Exception("not again")
-      when(mockLockRepositoryProvider.repo).thenReturn(mockLockRepository)
-      when(mockLockRepository.lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
       when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.failed(exception))
@@ -141,7 +136,7 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
       }
-      verify(mockLockRepository, times(1)).lock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
   }

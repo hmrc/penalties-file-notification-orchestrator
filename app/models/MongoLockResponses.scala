@@ -14,21 +14,13 @@
  * limitations under the License.
  */
 
-package repositories
+package models
 
 import play.api.Logging
-import play.modules.reactivemongo.ReactiveMongoComponent
 import scheduler.ScheduleStatus
-import uk.gov.hmrc.lock.LockMongoRepository
-
-import javax.inject.Inject
-
-class LockRepositoryProvider @Inject()(reactiveMongoComponent: ReactiveMongoComponent) {
-  lazy val repo = LockMongoRepository(reactiveMongoComponent.mongoConnector.db)
-}
 
 object MongoLockResponses extends Logging {
   case class UnknownException(e: Exception) extends ScheduleStatus.JobFailed {
-    logger.warn(e.getMessage)
+    logger.error(e.getMessage)
   }
 }
