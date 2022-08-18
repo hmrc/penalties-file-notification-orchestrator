@@ -19,29 +19,28 @@ package services
 import helpers.SDESStub
 import models.FailedJobResponses.FailedToProcessNotifications
 import models.SDESNotificationRecord
-import models.notification.{RecordStatusEnum, SDESAudit, SDESChecksum, SDESNotification, SDESNotificationFile, SDESProperties}
-import org.joda.time.Duration
+import models.notification._
 import org.mongodb.scala.Document
-import play.api.test.Helpers._
-import repositories.{FileNotificationRepository, LockRepositoryProvider}
-import uk.gov.hmrc.lock.LockRepository
-import utils.{IntegrationSpecCommonBase, LogCapturing}
 import org.scalatest.matchers.should.Matchers._
+import play.api.test.Helpers._
+import repositories.FileNotificationRepository
+import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.Logger.logger
+import utils.{IntegrationSpecCommonBase, LogCapturing}
 
 import java.time.LocalDateTime
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.DurationInt
 
 class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase with LogCapturing {
-  val lockRepositoryProviderRepo: LockRepository = injector.instanceOf[LockRepositoryProvider].repo
+  val lockRepository: MongoLockRepository = injector.instanceOf[MongoLockRepository]
   val service: SendFileNotificationsToSDESService = injector.instanceOf[SendFileNotificationsToSDESService]
   val notificationRepo: FileNotificationRepository = injector.instanceOf[FileNotificationRepository]
 
   class Setup {
     await(notificationRepo.collection.deleteMany(Document()).toFuture())
-    await(lockRepositoryProviderRepo.drop)
-    await(lockRepositoryProviderRepo.ensureIndexes)
-    await(lockRepositoryProviderRepo.count) shouldBe 0
+    await(lockRepository.collection.deleteMany(Document()).toFuture())
+    await(lockRepository.ensureIndexes)
+    await(lockRepository.collection.countDocuments().toFuture()) shouldBe 0
   }
 
   val notification1: SDESNotification = SDESNotification(informationType = "info",
@@ -71,13 +70,13 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
   "tryLock" should {
     "not do anything if the job is already locked" in new Setup {
       val randomServerId = "123"
-      val releaseDuration = Duration.standardSeconds(123)
-      await(lockRepositoryProviderRepo.count) shouldBe 0
-      await(lockRepositoryProviderRepo.lock(service.lockKeeper.lockId, randomServerId, releaseDuration))
-      await(lockRepositoryProviderRepo.count) shouldBe 1
+      val releaseDuration = 123.seconds
+      await(lockRepository.collection.countDocuments().toFuture()) shouldBe 0
+      await(lockRepository.takeLock(service.lockKeeper.lockId, randomServerId, releaseDuration))
+      await(lockRepository.collection.countDocuments().toFuture()) shouldBe 1
 
       await(service.invoke).right.get shouldBe s"${service.jobName} - JobAlreadyRunning"
-      await(lockRepositoryProviderRepo.count) shouldBe 1
+      await(lockRepository.collection.countDocuments().toFuture()) shouldBe 1
     }
   }
 

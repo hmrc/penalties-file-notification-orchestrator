@@ -20,8 +20,8 @@ import base.SpecBase
 import config.AppConfig
 import connectors.SDESConnector
 import models.notification._
-import org.mockito.{ArgumentCaptor, Matchers}
 import org.mockito.Mockito._
+import org.mockito.{ArgumentCaptor, Matchers}
 import play.api.test.Helpers._
 import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpClient, HttpResponse}
 

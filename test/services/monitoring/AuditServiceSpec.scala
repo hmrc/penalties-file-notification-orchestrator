@@ -29,8 +29,8 @@ import uk.gov.hmrc.play.audit.model.ExtendedDataEvent
 import utils.LogCapturing
 import utils.Logger.logger
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{ExecutionContext, Future}
 
 class AuditServiceSpec extends SpecBase with LogCapturing {
   val mockAuditConnector: AuditConnector = mock(classOf[AuditConnector])
