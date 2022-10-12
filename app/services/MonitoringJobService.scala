@@ -21,10 +21,11 @@ import play.api.Configuration
 import repositories.FileNotificationRepository
 import scheduler.{ScheduleStatus, ScheduledService}
 import utils.Logger.logger
-
 import javax.inject.Inject
 import models.notification.RecordStatusEnum
 import uk.gov.hmrc.mongo.lock.{LockRepository, LockService, MongoLockRepository}
+import utils.PagerDutyHelper
+import utils.PagerDutyHelper.PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION
 
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
@@ -70,6 +71,7 @@ class MonitoringJobService @Inject()(
         Right(Seq(s"$jobName - JobAlreadyRunning"))
     }.recover {
       case e: Exception =>
+        PagerDutyHelper.log("tryLock", MONGO_LOCK_UNKNOWN_EXCEPTION)
         logger.info(s"[$jobName] Failed with exception")
         Left(MongoLockResponses.UnknownException(e))
     }

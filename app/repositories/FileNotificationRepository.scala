@@ -27,8 +27,11 @@ import javax.inject.Inject
 import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
 import uk.gov.hmrc.mongo.MongoComponent
 import utils.Logger.logger
-
 import java.util.concurrent.TimeUnit
+
+import utils.PagerDutyHelper
+import utils.PagerDutyHelper.PagerDutyKeys._
+
 import scala.concurrent.{ExecutionContext, Future}
 
 class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
@@ -49,7 +52,8 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
     collection.insertMany(records).toFuture().map(_.wasAcknowledged())
       .recover {
         case e =>
-          logger.error(s"[FileNotificationRepository][storeFileNotifications] - Failed to insert SDES notification with message: ${e.getMessage}")
+          PagerDutyHelper.log("[FileNotificationRepository][insertFileNotifications]", FAILED_TO_INSERT_SDES_NOTIFICATION)
+          logger.error(s"[FileNotificationRepository][insertFileNotifications] - Failed to insert SDES notification with message: ${e.getMessage}")
           false
       }
   }

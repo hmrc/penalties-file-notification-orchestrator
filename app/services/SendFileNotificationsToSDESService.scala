@@ -26,10 +26,12 @@ import repositories.FileNotificationRepository
 import scheduler.{ScheduleStatus, ScheduledService}
 import uk.gov.hmrc.mongo.lock.{LockRepository, LockService, MongoLockRepository}
 import utils.Logger.logger
-import utils.TimeMachine
-
+import utils.{PagerDutyHelper, TimeMachine}
 import java.time.LocalDateTime
+
 import javax.inject.Inject
+import utils.PagerDutyHelper.PagerDutyKeys._
+
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -72,8 +74,10 @@ class SendFileNotificationsToSDESService @Inject()(
                     fileNotificationRepository.updateFileNotification(updatedRecord).map(_ => true)
                   }
                   case status if status >= 500 => {
+                    PagerDutyHelper.logStatusCode("invoke", status)(keyOn5xx = Some(RECEIVED_5XX_FROM_SDES))
                     logger.warn(s"[SendFileNotificationsToSDESService][invoke] - Received 5xx status ($status) from connector call to SDES")
                     if(notificationWrapper.numberOfAttempts >= 5) {
+                      PagerDutyHelper.log("invoke", NOTIFICATION_SET_TO_PERMANENT_FAILURE)
                       logger.info(s"[SendFileNotificationsToSDESService][invoke] - Notification (with reference: ${notificationWrapper.reference}) has reached retry threshold of 5 - setting to PERMANENT_FAILURE")
                       val updatedNotification: SDESNotificationRecord = setRecordToPermanentFailure(notificationWrapper)
                       fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => false)
@@ -90,6 +94,7 @@ class SendFileNotificationsToSDESService @Inject()(
                     }
                   }
                   case status if status >= 400 => {
+                    PagerDutyHelper.logStatusCode("invoke", status)(keyOn4xx = Some(RECEIVED_4XX_FROM_SDES))
                     logger.error(s"[SendFileNotificationsToSDESService][invoke] - Received 4xx status ($status) from connector call to SDES for reference: ${notificationWrapper.reference}")
                     val updatedNotification: SDESNotificationRecord = setRecordToPermanentFailure(notificationWrapper)
                     fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => false)
@@ -97,6 +102,7 @@ class SendFileNotificationsToSDESService @Inject()(
                 }
               }.recoverWith {
                 case e => {
+                  PagerDutyHelper.log("invoke", UNKNOWN_EXCEPTION_FROM_SDES)
                   logger.error(s"[SendFileNotificationsToSDESService][invoke] - Exception occurred processing notifications - message: ${e.getMessage} for reference: ${notificationWrapper.reference}")
                   val updatedNotification: SDESNotificationRecord = setRecordToPermanentFailure(notificationWrapper)
                   fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => false)
@@ -110,11 +116,13 @@ class SendFileNotificationsToSDESService @Inject()(
           logger.info(s"[SendFileNotificationsToSDESService][invoke] - Processed all notifications in batch")
           Right("Processed all notifications")
         } else {
+          PagerDutyHelper.log("invoke", FAILED_TO_PROCESS_FILE_NOTIFICATION)
           logger.error(s"[SendFileNotificationsToSDESService][invoke] - Failed to process all notifications (see previous logs)")
           Left(FailedToProcessNotifications)
         }
       }.recover {
         case e => {
+          PagerDutyHelper.log("invoke", UNKNOWN_PROCESSING_EXCEPTION)
           logger.info(s"[SendFileNotificationsToSDESService][invoke] - An unknown exception occurred processing a batch with error: ${e.getMessage}")
           Left(UnknownProcessingException)
         }
@@ -130,6 +138,7 @@ class SendFileNotificationsToSDESService @Inject()(
         Right(s"$jobName - JobAlreadyRunning")
     }.recover {
       case e: Exception =>
+        PagerDutyHelper.log("tryLock", MONGO_LOCK_UNKNOWN_EXCEPTION)
         logger.info(s"[$jobName] Failed with exception")
         Left(MongoLockResponses.UnknownException(e))
     }
