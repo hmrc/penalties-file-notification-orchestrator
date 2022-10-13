@@ -20,12 +20,15 @@ import javax.inject.Inject
 import models.SDESNotificationRecord
 import models.notification.SDESNotification
 import repositories.FileNotificationRepository
+import utils.Logger.logger
 
 import scala.concurrent.Future
 
 class NotificationMongoService @Inject()(repo: FileNotificationRepository) {
 
   def insertNotificationRecordsIntoMongo(notifications: Seq[SDESNotification]): Future[Boolean] = {
+    logger.info(s"[receiveSDESNotifications][NotificationMongoService][insertNotificationRecordsIntoMongo] - " +
+      s"Attempting to insert ${notifications.size} notifications into Mongo")
     val records = notifications.map(notification => SDESNotificationRecord(reference = notification.audit.correlationID, notification = notification))
     repo.insertFileNotifications(records)
   }
