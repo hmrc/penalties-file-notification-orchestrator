@@ -55,6 +55,7 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
   }
 
   def updateFileNotification(record: SDESNotificationRecord): Future[SDESNotificationRecord] = {
+    logger.info(s"[FileNotificationRepository][updateFileNotification] - Updating record ${record.reference} in Mongo")
     collection.findOneAndUpdate(equal("reference", record.reference), combine(
       set("nextAttemptAt", Codecs.toBson(record.nextAttemptAt)),
       set("status", record.status.toString),

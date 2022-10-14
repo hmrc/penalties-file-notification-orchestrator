@@ -46,6 +46,7 @@ class OrchestratorController @Inject()(mongoService: NotificationMongoService,
             notifications => {
               mongoService.insertNotificationRecordsIntoMongo(notifications).map {
                 case true =>
+                  logger.info(s"[OrchestratorController][receiveSDESNotifications] Successfully inserted ${notifications.size} notifications")
                   Ok("File Notification inserted")
                 case false =>
                   logger.error(s"[OrchestratorController][receiveSIDESNotifications] Failed to insert File Notifications")

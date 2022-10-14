@@ -155,7 +155,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
           val result = await(service.invoke)
           result.isLeft shouldBe true
           result.left.get shouldBe FailedToProcessNotifications
-          logs.exists(_.getMessage.equals(s"[SendFileNotificationsToSDESService][invoke] - Received 4xx status (400) from connector call to SDES")) shouldBe true
+          logs.exists(_.getMessage.contains(s"[SendFileNotificationsToSDESService][invoke] - Received 4xx status (400) from connector call to SDES")) shouldBe true
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
           val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get

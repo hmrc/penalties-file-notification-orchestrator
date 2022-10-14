@@ -56,30 +56,31 @@ class SendFileNotificationsToSDESService @Inject()(
       logger.info(s"[$jobName][invoke] - Job started")
       fileNotificationRepository.getPendingNotifications().flatMap {
         notifications => {
-          logger.debug(s"[SendFileNotificationsToSDESService][invoke] - Amount of notifications: ${notifications.size} before filtering")
+          logger.info(s"[SendFileNotificationsToSDESService][invoke] - Amount of notifications: ${notifications.size} before filtering")
           val notificationCandidates = notifications.filter(notification =>
             notification.nextAttemptAt.isEqual(timeMachine.now) || notification.nextAttemptAt.isBefore(timeMachine.now))
-          logger.debug(s"[SendFileNotificationsToSDESService][invoke] - Amount of notifications: ${notificationCandidates.size} after filtering")
+          logger.info(s"[SendFileNotificationsToSDESService][invoke] - Amount of notifications: ${notificationCandidates.size} after filtering")
           Future.sequence(notificationCandidates.map {
             notificationWrapper => {
               val notificationToSend: SDESNotification = notificationWrapper.notification
+              logger.info(s"[SendFileNotificationsToSDESService][invoke] - Sending notification (reference: ${notificationWrapper.reference}) to SDES")
               sdesConnector.sendNotificationToSDES(notificationToSend).flatMap {
                 _.status match {
                   case NO_CONTENT => {
-                    logger.debug(s"[SendFileNotificationsToSDESService][invoke] - Received NO_CONTENT from connector call to SDES")
+                    logger.info(s"[SendFileNotificationsToSDESService][invoke] - Received NO_CONTENT from connector call to SDES for notification with reference: ${notificationWrapper.reference}")
                     val updatedRecord: SDESNotificationRecord = notificationWrapper.copy(status = RecordStatusEnum.SENT, updatedAt = timeMachine.now)
                     fileNotificationRepository.updateFileNotification(updatedRecord).map(_ => true)
                   }
                   case status if status >= 500 => {
                     logger.warn(s"[SendFileNotificationsToSDESService][invoke] - Received 5xx status ($status) from connector call to SDES")
                     if(notificationWrapper.numberOfAttempts >= 5) {
-                      logger.debug(s"[SendFileNotificationsToSDESService][invoke] - Notification has reached retry threshold of 5 - setting to PERMANENT_FAILURE")
+                      logger.info(s"[SendFileNotificationsToSDESService][invoke] - Notification (with reference: ${notificationWrapper.reference}) has reached retry threshold of 5 - setting to PERMANENT_FAILURE")
                       val updatedNotification: SDESNotificationRecord = setRecordToPermanentFailure(notificationWrapper)
                       fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => false)
                     } else {
-                      logger.debug(s"[SendFileNotificationsToSDESService][invoke] - Increasing notification retries and nextAttemptAt")
+                      logger.info(s"[SendFileNotificationsToSDESService][invoke] - Increasing notification retries and nextAttemptAt for reference: ${notificationWrapper.reference}")
                       val updatedNextAttemptAt: LocalDateTime = updateNextAttemptAtTimestamp(notificationWrapper)
-                      logger.debug(s"[SendFileNotificationsToSDESService][invoke] - Setting nextAttemptAt to: $updatedNextAttemptAt (retry count: ${notificationWrapper.numberOfAttempts})")
+                      logger.info(s"[SendFileNotificationsToSDESService][invoke] - Setting nextAttemptAt to: $updatedNextAttemptAt for reference: ${notificationWrapper.reference} (retry count: ${notificationWrapper.numberOfAttempts})")
                       val updatedNotification: SDESNotificationRecord = notificationWrapper.copy(
                         nextAttemptAt = updatedNextAttemptAt,
                         numberOfAttempts = notificationWrapper.numberOfAttempts + 1,
@@ -89,14 +90,14 @@ class SendFileNotificationsToSDESService @Inject()(
                     }
                   }
                   case status if status >= 400 => {
-                    logger.error(s"[SendFileNotificationsToSDESService][invoke] - Received 4xx status ($status) from connector call to SDES")
+                    logger.error(s"[SendFileNotificationsToSDESService][invoke] - Received 4xx status ($status) from connector call to SDES for reference: ${notificationWrapper.reference}")
                     val updatedNotification: SDESNotificationRecord = setRecordToPermanentFailure(notificationWrapper)
                     fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => false)
                   }
                 }
               }.recoverWith {
                 case e => {
-                  logger.error(s"[SendFileNotificationsToSDESService][invoke] - Exception occurred processing notifications - message: ${e.getMessage}")
+                  logger.error(s"[SendFileNotificationsToSDESService][invoke] - Exception occurred processing notifications - message: ${e.getMessage} for reference: ${notificationWrapper.reference}")
                   val updatedNotification: SDESNotificationRecord = setRecordToPermanentFailure(notificationWrapper)
                   fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => false)
                 }
@@ -105,9 +106,18 @@ class SendFileNotificationsToSDESService @Inject()(
           })
         }.map(_.forall(identity))
       }.map {
-        if (_) Right("Processed all notifications") else Left(FailedToProcessNotifications)
+        if (_) {
+          logger.info(s"[SendFileNotificationsToSDESService][invoke] - Processed all notifications in batch")
+          Right("Processed all notifications")
+        } else {
+          logger.error(s"[SendFileNotificationsToSDESService][invoke] - Failed to process all notifications (see previous logs)")
+          Left(FailedToProcessNotifications)
+        }
       }.recover {
-        case _ => Left(UnknownProcessingException)
+        case e => {
+          logger.info(s"[SendFileNotificationsToSDESService][invoke] - An unknown exception occurred processing a batch with error: ${e.getMessage}")
+          Left(UnknownProcessingException)
+        }
       }
     }
   }
