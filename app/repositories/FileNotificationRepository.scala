@@ -52,7 +52,7 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
     collection.insertMany(records).toFuture().map(_.wasAcknowledged())
       .recover {
         case e =>
-          PagerDutyHelper.log("[FileNotificationRepository][insertFileNotifications]", FAILED_TO_INSERT_SDES_NOTIFICATION)
+          PagerDutyHelper.log("insertFileNotifications", FAILED_TO_INSERT_SDES_NOTIFICATION)
           logger.error(s"[FileNotificationRepository][insertFileNotifications] - Failed to insert SDES notification with message: ${e.getMessage}")
           false
       }

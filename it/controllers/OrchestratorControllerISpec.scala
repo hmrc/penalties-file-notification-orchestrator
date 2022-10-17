@@ -19,16 +19,19 @@ package controllers
 import models.SDESNotificationRecord
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.result.DeleteResult
+import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.matchers.should.Matchers._
 import play.api.libs.json.{JsValue, Json}
 import play.api.libs.ws.WSResponse
 import play.api.test.Helpers.{await, _}
 import repositories.FileNotificationRepository
-import utils.IntegrationSpecCommonBase
+import utils.Logger.logger
+import utils.PagerDutyHelper.PagerDutyKeys
+import utils.{IntegrationSpecCommonBase, LogCapturing}
 
 import scala.concurrent.Future
 
-class OrchestratorControllerISpec extends IntegrationSpecCommonBase {
+class OrchestratorControllerISpec extends IntegrationSpecCommonBase with LogCapturing {
 
   val controller: OrchestratorController = injector.instanceOf[OrchestratorController]
   lazy val repository: FileNotificationRepository = injector.instanceOf[FileNotificationRepository]
@@ -146,10 +149,17 @@ class OrchestratorControllerISpec extends IntegrationSpecCommonBase {
             |}]
             |""".stripMargin
         )
-        val result: WSResponse = await(buildClientForRequestToApp(uri = "/new-notifications").post(
-         jsonToReceiveWithDuplicateCorrelationID
-        ))
-        result.status shouldBe INTERNAL_SERVER_ERROR
+        withCaptureOfLoggingFrom(logger) {
+          logs => {
+            val result: WSResponse = await(buildClientForRequestToApp(uri = "/new-notifications").post(
+              jsonToReceiveWithDuplicateCorrelationID
+            ))
+            result.status shouldBe INTERNAL_SERVER_ERROR
+            eventually {
+              logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_INSERT_SDES_NOTIFICATION))
+            }
+          }
+        }
       }
     }
   }
