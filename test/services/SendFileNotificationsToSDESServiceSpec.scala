@@ -30,8 +30,11 @@ import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.Logger.logger
 import utils.{LogCapturing, TimeMachine}
-
 import java.time.LocalDateTime
+
+import org.scalatest.concurrent.Eventually.eventually
+import utils.PagerDutyHelper.PagerDutyKeys
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -121,6 +124,14 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
       val result = await(service.invoke)
       result.isLeft shouldBe true
       result.left.get shouldBe FailedToProcessNotifications
+      withCaptureOfLoggingFrom(logger) {
+        logs => {
+          eventually {
+            logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_5XX_FROM_SDES))
+            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION))
+          }
+        }
+      }
       verify(mockSDESConnector, times(2)).sendNotificationToSDES(Matchers.any())(Matchers.any())
       val updatedNotificationRecordSent: SDESNotificationRecord = notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = mockDateTime)
       val updatedNotificationRecordPending: SDESNotificationRecord = notificationRecord.copy(status = RecordStatusEnum.PENDING, updatedAt = mockDateTime, numberOfAttempts = 2, nextAttemptAt = mockDateTime.plusMinutes(30).minusSeconds(1))
@@ -137,6 +148,14 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
       val result = await(service.invoke)
       result.isLeft shouldBe true
       result.left.get shouldBe FailedToProcessNotifications
+      withCaptureOfLoggingFrom(logger) {
+        logs => {
+          eventually {
+            logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_5XX_FROM_SDES))
+            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION))
+          }
+        }
+      }
       verify(mockFileNotificationRepository, times(2)).updateFileNotification(Matchers.any())
 
     }
@@ -156,6 +175,14 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         val result = await(service.invoke)
         result.isLeft shouldBe true
         result.left.get shouldBe FailedToProcessNotifications
+        withCaptureOfLoggingFrom(logger) {
+          logs => {
+            eventually {
+              logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_5XX_FROM_SDES))
+              logs.exists(_.getMessage.contains(PagerDutyKeys.NOTIFICATION_SET_TO_PERMANENT_FAILURE))
+            }
+          }
+        }
       }
 
       "a 4xx response has been received" in new Setup {
@@ -172,6 +199,13 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         val result = await(service.invoke)
         result.isLeft shouldBe true
         result.left.get shouldBe FailedToProcessNotifications
+        withCaptureOfLoggingFrom(logger) {
+          logs => {
+            eventually {
+              logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_4XX_FROM_SDES))
+            }
+          }
+        }
       }
 
       "an unknown exception has occurred" in new Setup {
@@ -188,6 +222,13 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         val result = await(service.invoke)
         result.isLeft shouldBe true
         result.left.get shouldBe FailedToProcessNotifications
+        withCaptureOfLoggingFrom(logger) {
+          logs => {
+            eventually {
+              logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_EXCEPTION_FROM_SDES))
+            }
+          }
+        }
       }
     }
 
@@ -212,6 +253,13 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
       val result = await(service.invoke)
       result.isLeft shouldBe true
       result.left.get shouldBe UnknownProcessingException
+      withCaptureOfLoggingFrom(logger) {
+        logs => {
+          eventually {
+            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION))
+          }
+        }
+      }
     }
   }
 
@@ -252,6 +300,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
+        capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION))
       }
 
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
@@ -268,6 +317,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
+        capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION))
       }
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())

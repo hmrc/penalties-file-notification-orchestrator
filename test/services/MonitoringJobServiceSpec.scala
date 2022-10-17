@@ -21,12 +21,14 @@ import models.MongoLockResponses
 import models.notification.RecordStatusEnum
 import org.mockito.Matchers
 import org.mockito.Mockito._
+import org.scalatest.concurrent.Eventually.eventually
 import play.api.Configuration
 import play.api.test.Helpers._
 import repositories.FileNotificationRepository
 import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.LogCapturing
 import utils.Logger.logger
+import utils.PagerDutyHelper.PagerDutyKeys
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -119,6 +121,9 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
+        eventually {
+          capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION))
+        }
       }
 
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
@@ -135,6 +140,9 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
+        eventually {
+          capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION))
+        }
       }
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())

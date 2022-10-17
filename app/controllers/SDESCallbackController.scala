@@ -23,8 +23,10 @@ import play.api.mvc.{Action, AnyContent, ControllerComponents}
 import services.monitoring.AuditService
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import utils.Logger.logger
-
 import javax.inject.Inject
+import utils.PagerDutyHelper
+import utils.PagerDutyHelper.PagerDutyKeys._
+
 import scala.concurrent.{ExecutionContext, Future}
 
 class SDESCallbackController @Inject()(auditService: AuditService, cc: ControllerComponents)(implicit ec: ExecutionContext)
@@ -33,6 +35,7 @@ class SDESCallbackController @Inject()(auditService: AuditService, cc: Controlle
   def handleCallback: Action[AnyContent] = Action.async {
     implicit request => {
       request.body.asJson.fold({
+        PagerDutyHelper.log("handleCallback", FAILED_TO_VALIDATE_REQUEST_AS_JSON)
         logger.error("[SDESCallbackController][handleCallback] Failed to validate request body as JSON")
         Future(BadRequest("Invalid body received i.e. could not be parsed to JSON"))
       })(
@@ -40,6 +43,7 @@ class SDESCallbackController @Inject()(auditService: AuditService, cc: Controlle
           val parseResultToModel = Json.fromJson(jsonBody)(SDESCallback.apiSDESCallbackReads)
           parseResultToModel.fold(
             failure => {
+              PagerDutyHelper.log("handleCallback", FAILED_TO_PARSE_REQUEST_TO_MODEL)
               logger.error("[SDESCallbackController][handleCallback] Fail to parse request body to model")
               logger.debug(s"[SDESCallbackController][handleCallback] Parse failure(s): $failure")
               Future(BadRequest("Failed to parse to model"))

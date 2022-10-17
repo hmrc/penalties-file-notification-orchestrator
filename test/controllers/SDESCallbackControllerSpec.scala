@@ -25,13 +25,18 @@ import play.api.libs.json.{JsValue, Json}
 import play.api.mvc.Result
 import play.api.test.Helpers.{contentAsString, defaultAwaitTimeout, status, stubControllerComponents}
 import services.monitoring.AuditService
-
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
+
+import org.scalatest.concurrent.Eventually.eventually
+import utils.LogCapturing
+import utils.Logger.logger
+import utils.PagerDutyHelper.PagerDutyKeys
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class SDESCallbackControllerSpec extends SpecBase {
+class SDESCallbackControllerSpec extends SpecBase with LogCapturing {
   val mockAuditService: AuditService = mock(classOf[AuditService])
 
   class Setup() {
@@ -83,9 +88,16 @@ class SDESCallbackControllerSpec extends SpecBase {
 
     "return content string for Invalid sdesCallback JSON Body" when {
       "the JSON request body is invalid " in new Setup {
-        val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest)
-        status(result) shouldBe BAD_REQUEST
-        contentAsString(result) shouldBe "Invalid body received i.e. could not be parsed to JSON"
+        withCaptureOfLoggingFrom(logger) {
+          logs => {
+            val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest)
+            status(result) shouldBe BAD_REQUEST
+            contentAsString(result) shouldBe "Invalid body received i.e. could not be parsed to JSON"
+            eventually {
+              logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_VALIDATE_REQUEST_AS_JSON.toString)) shouldBe true
+            }
+          }
+        }
       }
 
       "the sdesCallback JSON body is valid but can not be serialised to a model" in new Setup {
@@ -106,9 +118,16 @@ class SDESCallbackControllerSpec extends SpecBase {
             |}]
             |""".stripMargin
         )
-        val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(invalidBody))
-        status(result) shouldBe BAD_REQUEST
-        contentAsString(result) shouldBe "Failed to parse to model"
+        withCaptureOfLoggingFrom(logger) {
+          logs => {
+            val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(invalidBody))
+            status(result) shouldBe BAD_REQUEST
+            contentAsString(result) shouldBe "Failed to parse to model"
+            eventually {
+              logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PARSE_REQUEST_TO_MODEL.toString)) shouldBe true
+            }
+          }
+        }
       }
     }
   }
