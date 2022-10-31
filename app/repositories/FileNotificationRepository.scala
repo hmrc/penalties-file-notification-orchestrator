@@ -33,6 +33,7 @@ import utils.PagerDutyHelper
 import utils.PagerDutyHelper.PagerDutyKeys._
 
 import scala.concurrent.{ExecutionContext, Future}
+import javax.inject.Singleton
 
 @Singleton
 class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
