@@ -34,6 +34,7 @@ import utils.PagerDutyHelper.PagerDutyKeys._
 
 import scala.concurrent.{ExecutionContext, Future}
 
+@Singleton
 class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
                                            appConfig: AppConfig)(implicit ec: ExecutionContext)
   extends PlayMongoRepository[SDESNotificationRecord](
