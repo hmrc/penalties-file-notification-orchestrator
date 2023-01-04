@@ -21,7 +21,7 @@ sealed trait FeatureSwitch {
 }
 
 object FeatureSwitch {
-  val prefix: String = "feature.switch"
+  val prefix: String = "feature-switch"
   val listOfAllFeatureSwitches: List[FeatureSwitch] = List(UseInternalAuth)
 }
 

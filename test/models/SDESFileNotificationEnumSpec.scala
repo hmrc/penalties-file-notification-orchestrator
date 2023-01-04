@@ -45,4 +45,11 @@ class SDESFileNotificationEnumSpec extends AnyWordSpec with Matchers {
     result.isSuccess shouldBe true
     result.get shouldBe SDESFileNotificationEnum.FileProcessed
   }
+
+  "throw an error" when {
+    "the value can't be read" in {
+      val result = Json.fromJson(JsString("xyz"))(SDESFileNotificationEnum.format)
+      result.isError shouldBe true
+    }
+  }
 }

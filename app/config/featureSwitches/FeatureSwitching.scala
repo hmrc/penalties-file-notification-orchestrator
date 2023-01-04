@@ -17,9 +17,6 @@
 package config.featureSwitches
 
 import config.AppConfig
-import utils.Logger.logger
-
-import java.time.LocalDate
 
 trait FeatureSwitching {
   implicit val appConfig: AppConfig
