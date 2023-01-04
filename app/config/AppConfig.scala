@@ -16,6 +16,7 @@
 
 package config
 
+import config.featureSwitches.FeatureSwitch
 import play.api.Configuration
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
@@ -46,5 +47,5 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
 
   val notificationTtl:Long = config.get[Long]("mongo-config.ttlHours")
 
-
+  def isFeatureSwitchEnabled(featureSwitch: FeatureSwitch): Boolean = config.get[Boolean](featureSwitch.name)
 }
