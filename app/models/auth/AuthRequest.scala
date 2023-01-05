@@ -14,18 +14,12 @@
  * limitations under the License.
  */
 
-package config.featureSwitches
+package models.auth
 
-sealed trait FeatureSwitch {
-  val name: String
-}
+import play.api.mvc.{Request, WrappedRequest}
+import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.internalauth.client.{AuthenticatedRequest, AuthorizationToken}
 
-object FeatureSwitch {
-  val prefix: String = "feature-switch"
-  val listOfAllFeatureSwitches: List[FeatureSwitch] = List(UseInternalAuth)
-}
-
-case object UseInternalAuth extends FeatureSwitch {
-  override val name: String = s"${FeatureSwitch.prefix}.use-internal-auth"
-}
-
+case class AuthRequest[A](request : Request[A],
+                          headerCarrier : HeaderCarrier,
+                          authorizationToken: AuthorizationToken) extends WrappedRequest(request)

@@ -63,7 +63,9 @@ trait IntegrationSpecCommonBase extends AnyWordSpec with GuiceOneServerPerSuite 
         "microservice.services.penalties-stub.port" -> stubPort,
         "microservice.services.sdes.host" -> stubHost,
         "microservice.services.penalties-stub.port" -> stubPort,
-        "sdes.srn" -> stubSRN
+        "microservice.services.internal-auth.port" -> stubPort,
+        "sdes.srn" -> stubSRN,
+        "feature-switch.use-internal-auth" -> true
       )
     )
     .build()
@@ -71,6 +73,6 @@ trait IntegrationSpecCommonBase extends AnyWordSpec with GuiceOneServerPerSuite 
   lazy val ws = app.injector.instanceOf[WSClient]
 
   def buildClientForRequestToApp(baseUrl: String = "/penalties-file-notification-orchestrator", uri: String): WSRequest = {
-    ws.url(s"http://localhost:$port$baseUrl$uri").withFollowRedirects(false)
+    ws.url(s"http://localhost:$port$baseUrl$uri").withFollowRedirects(false).addHttpHeaders("Authorization" -> "Token some-token")
   }
 }
