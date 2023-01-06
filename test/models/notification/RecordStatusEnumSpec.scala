@@ -61,5 +61,12 @@ class RecordStatusEnumSpec extends SpecBase {
         result.get shouldBe RecordStatusEnum.PERMANENT_FAILURE
       }
     }
+
+    "throw an error" when {
+      "the value can't be read" in {
+        val result = Json.fromJson(JsString("xyz"))(RecordStatusEnum.format)
+        result.isError shouldBe true
+      }
+    }
   }
 }
