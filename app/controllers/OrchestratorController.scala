@@ -16,11 +16,15 @@
 
 package controllers
 
+import config.AppConfig
+import controllers.actions.InternalAuthActions
+
 import javax.inject.Inject
 import models.notification.SDESNotification
 import play.api.libs.json.{Json, Reads}
 import play.api.mvc.{Action, AnyContent, ControllerComponents}
 import services.NotificationMongoService
+import uk.gov.hmrc.internalauth.client.BackendAuthComponents
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import utils.Logger.logger
 import utils.PagerDutyHelper
@@ -29,22 +33,24 @@ import utils.PagerDutyHelper.PagerDutyKeys._
 import scala.concurrent.{ExecutionContext, Future}
 
 class OrchestratorController @Inject()(mongoService: NotificationMongoService,
-                                       cc: ControllerComponents)(implicit ec: ExecutionContext) extends BackendController(cc) {
+                                       cc: ControllerComponents)(implicit ec: ExecutionContext,
+                                                                 val appConfig: AppConfig,
+                                                                 val auth: BackendAuthComponents) extends BackendController(cc) with InternalAuthActions {
 
-  def receiveSDESNotifications(): Action[AnyContent] = Action.async {
+  def receiveSDESNotifications(): Action[AnyContent] = authoriseService.async {
     implicit request => {
       request.body.asJson.fold({
-        PagerDutyHelper.log("receiveSIDESNotifications", FAILED_TO_VALIDATE_REQUEST_AS_JSON)
-        logger.error("[OrchestratorController][receiveSIDESNotifications] Failed to validate request body as JSON")
+        PagerDutyHelper.log("receiveSDESNotifications", FAILED_TO_VALIDATE_REQUEST_AS_JSON)
+        logger.error("[OrchestratorController][receiveSDESNotifications] Failed to validate request body as JSON")
         Future(BadRequest("Invalid body received i.e. could not be parsed to JSON"))
       })(
         jsonBody => {
           val parseResultToModel = Json.fromJson(jsonBody)(Reads.seq(SDESNotification.apiReads))
           parseResultToModel.fold(
             failure => {
-              PagerDutyHelper.log("receiveSIDESNotifications", FAILED_TO_PARSE_REQUEST_TO_MODEL)
-              logger.error("[OrchestratorController][receiveSIDESNotifications] Fail to parse request body to model")
-              logger.debug(s"[OrchestratorController][receiveSIDESNotifications] Parse failure(s): $failure")
+              PagerDutyHelper.log("receiveSDESNotifications", FAILED_TO_PARSE_REQUEST_TO_MODEL)
+              logger.error("[OrchestratorController][receiveSDESNotifications] Fail to parse request body to model")
+              logger.debug(s"[OrchestratorController][receiveSDESNotifications] Parse failure(s): $failure")
               Future(BadRequest("Failed to parse to model"))
             },
             notifications => {
@@ -53,13 +59,13 @@ class OrchestratorController @Inject()(mongoService: NotificationMongoService,
                   logger.info(s"[OrchestratorController][receiveSDESNotifications] Successfully inserted ${notifications.size} notifications")
                   Ok("File Notification inserted")
                 case false =>
-                  PagerDutyHelper.log("receiveSIDESNotifications", FAILED_TO_INSERT_FILE_NOTIFICATION)
-                  logger.error(s"[OrchestratorController][receiveSIDESNotifications] Failed to insert File Notifications")
+                  PagerDutyHelper.log("receiveSDESNotifications", FAILED_TO_INSERT_FILE_NOTIFICATION)
+                  logger.error(s"[OrchestratorController][receiveSDESNotifications] Failed to insert File Notifications")
                   InternalServerError("Failed to insert File Notifications")
               } recover {
                 case e =>
-                  PagerDutyHelper.log("receiveSIDESNotifications", UNKNOWN_EXCEPTION_FROM_SDES)
-                  logger.error(s"[OrchestratorController][receiveSIDESNotifications] Unknown exception occurred with message: ${e.getMessage}")
+                  PagerDutyHelper.log("receiveSDESNotifications", UNKNOWN_EXCEPTION_FROM_SDES)
+                  logger.error(s"[OrchestratorController][receiveSDESNotifications] Unknown exception occurred with message: ${e.getMessage}")
                   InternalServerError("Something went wrong.")
               }
             }

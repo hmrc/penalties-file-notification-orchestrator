@@ -29,7 +29,7 @@ import utils.{IntegrationSpecCommonBase, LogCapturing}
 import java.time.LocalDateTime
 import scala.concurrent.duration.DurationInt
 
-class MonitoringJobISpec extends IntegrationSpecCommonBase with LogCapturing {
+class MonitoringJobServiceISpec extends IntegrationSpecCommonBase with LogCapturing {
   class Setup {
     val lockRepository: MongoLockRepository = injector.instanceOf[MongoLockRepository]
     val service: MonitoringJobService = app.injector.instanceOf[MonitoringJobService]

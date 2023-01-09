@@ -30,6 +30,6 @@ class SpecBase extends AnyWordSpec with ShouldMatchers with GuiceOneAppPerSuite 
 
   implicit val appConfig: AppConfig = injector.instanceOf[AppConfig]
 
-  val fakeRequest: FakeRequest[AnyContent] = FakeRequest("GET", "/")
+  val fakeRequest: FakeRequest[AnyContent] = FakeRequest("GET", "/").withHeaders("Authorization" -> "Token some-token")
 
 }

@@ -18,14 +18,20 @@ package controllers
 
 import base.SpecBase
 import config.AppConfig
+import config.featureSwitches.UseInternalAuth
 import models.notification._
+import org.mockito.Matchers
 import org.mockito.Mockito.{mock, reset, when}
 import org.scalatest.concurrent.Eventually.eventually
 import play.api.libs.json.{JsValue, Json}
-import play.api.mvc.Result
+import play.api.mvc.{ControllerComponents, Result}
+import play.api.test.FakeRequest
 import play.api.test.Helpers._
 import repositories.FileNotificationRepository
 import services.NotificationMongoService
+import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.internalauth.client.{BackendAuthComponents, Retrieval}
+import uk.gov.hmrc.internalauth.client.test.{BackendAuthComponentsStub, StubBehaviour}
 import utils.LogCapturing
 import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys
@@ -36,12 +42,20 @@ import scala.concurrent.Future
 class OrchestratorControllerSpec extends SpecBase with LogCapturing {
   val mockRepo: FileNotificationRepository = mock(classOf[FileNotificationRepository])
   val mockService: NotificationMongoService = mock(classOf[NotificationMongoService])
+  implicit val cc: ControllerComponents = stubControllerComponents()
   val mockAppConfig: AppConfig = mock(classOf[AppConfig])
+  lazy val mockAuth: StubBehaviour = mock(classOf[StubBehaviour])
+  lazy val authComponent: BackendAuthComponents = BackendAuthComponentsStub(mockAuth)
 
   class Setup() {
+    sys.props -= UseInternalAuth.name
     reset(mockAppConfig)
     reset(mockRepo)
-    val controller = new OrchestratorController(mockService, stubControllerComponents())
+    reset(mockAuth)
+    reset(mockService)
+    when(mockAuth.stubAuth(Matchers.any(), Matchers.any[Retrieval[Unit]])).thenReturn(Future.unit)
+    when(mockAppConfig.isFeatureSwitchEnabled(Matchers.eq(UseInternalAuth))).thenReturn(true)
+    val controller = new OrchestratorController(mockService, cc)(implicitly, mockAppConfig, authComponent)
   }
 
   val notifications: Seq[SDESNotification] = Seq(
@@ -94,10 +108,10 @@ class OrchestratorControllerSpec extends SpecBase with LogCapturing {
       |""".stripMargin
   )
 
-  "receiveSIDESNotifications" should {
+  "receiveSDESNotifications" should {
     "return OK (200)" when {
       "the JSON request body is successfully inserted into Mongo" in new Setup {
-        when(mockService.insertNotificationRecordsIntoMongo(notifications)).thenReturn(Future.successful(true))
+        when(mockService.insertNotificationRecordsIntoMongo(Matchers.eq(notifications))).thenReturn(Future.successful(true))
         val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest.withJsonBody(sdesJson))
         status(result) shouldBe OK
       }
@@ -147,7 +161,7 @@ class OrchestratorControllerSpec extends SpecBase with LogCapturing {
       "repository fails to insert File Notification" in new Setup {
         withCaptureOfLoggingFrom(logger) {
           logs => {
-            when(mockService.insertNotificationRecordsIntoMongo(notifications)).thenReturn(Future.successful(false))
+            when(mockService.insertNotificationRecordsIntoMongo(Matchers.eq(notifications))).thenReturn(Future.successful(false))
             val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest.withJsonBody(sdesJson))
             status(result) shouldBe INTERNAL_SERVER_ERROR
             contentAsString(result) shouldBe "Failed to insert File Notifications"
@@ -162,7 +176,7 @@ class OrchestratorControllerSpec extends SpecBase with LogCapturing {
 
         withCaptureOfLoggingFrom(logger) {
           logs => {
-            when(mockService.insertNotificationRecordsIntoMongo(notifications)).thenReturn(Future.failed(new Exception("ERROR")))
+            when(mockService.insertNotificationRecordsIntoMongo(Matchers.eq(notifications))).thenReturn(Future.failed(new Exception("ERROR")))
             val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest.withJsonBody(sdesJson))
             status(result) shouldBe INTERNAL_SERVER_ERROR
             contentAsString(result) shouldBe "Something went wrong."
@@ -171,6 +185,21 @@ class OrchestratorControllerSpec extends SpecBase with LogCapturing {
             }
           }
         }
+      }
+    }
+
+    "return UNAUTHORIZED (401)" when {
+      "no authentication has been provided" in new Setup {
+        val result: Future[Result] = controller.receiveSDESNotifications()(FakeRequest("GET", "/").withJsonBody(sdesJson))
+        status(result) shouldBe UNAUTHORIZED
+      }
+    }
+
+    "return FORBIDDEN (403)" when {
+      "the calling service is not authenticated" in new Setup {
+        when(mockAuth.stubAuth(Matchers.any(), Matchers.any())).thenReturn(Future.failed(UpstreamErrorResponse("FORBIDDEN", FORBIDDEN)))
+        val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest.withJsonBody(sdesJson))
+        status(result) shouldBe FORBIDDEN
       }
     }
   }
