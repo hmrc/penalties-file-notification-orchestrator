@@ -18,22 +18,23 @@ package repositories
 
 import com.mongodb.client.model.Updates.{combine, set}
 import config.AppConfig
-import org.mongodb.scala.model.Indexes.ascending
-import org.mongodb.scala.model.{IndexModel, IndexOptions}
 import models.SDESNotificationRecord
 import models.notification.RecordStatusEnum
 import org.mongodb.scala.model.Filters.equal
-import javax.inject.Inject
-import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
+import org.mongodb.scala.model.Indexes.ascending
+import org.mongodb.scala.model.{IndexModel, IndexOptions}
+import play.api.libs.json.{Format, Json, OFormat}
 import uk.gov.hmrc.mongo.MongoComponent
+import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
+import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
 import utils.Logger.logger
-import java.util.concurrent.TimeUnit
-
 import utils.PagerDutyHelper
 import utils.PagerDutyHelper.PagerDutyKeys._
 
+import java.time.LocalDateTime
+import java.util.concurrent.TimeUnit
+import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
-import javax.inject.Singleton
 
 @Singleton
 class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
@@ -43,12 +44,13 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
     mongoComponent = mongoComponent,
     domainFormat = SDESNotificationRecord.mongoFormats,
     indexes = Seq(
-      IndexModel(
-        ascending("reference"), IndexOptions().unique(true)
-      ),
+      IndexModel(ascending("reference"), IndexOptions().unique(true)),
       IndexModel(ascending("status")),
       IndexModel(ascending("createdAt"), IndexOptions().expireAfter(appConfig.notificationTtl, TimeUnit.HOURS))
-    )) {
+    )) with MongoJavatimeFormats {
+
+  implicit val dateFormat: Format[LocalDateTime] = localDateTimeFormat
+  implicit val mongoFormats: OFormat[SDESNotificationRecord] = Json.format[SDESNotificationRecord]
 
   def insertFileNotifications(records: Seq[SDESNotificationRecord]): Future[Boolean] = {
     collection.insertMany(records).toFuture().map(_.wasAcknowledged())
