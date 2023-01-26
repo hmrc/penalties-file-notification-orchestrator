@@ -23,15 +23,19 @@ import org.mongodb.scala.model.{IndexModel, IndexOptions}
 import models.SDESNotificationRecord
 import models.notification.RecordStatusEnum
 import org.mongodb.scala.model.Filters.equal
+import play.api.libs.json.{Format, Json, OFormat}
+
 import javax.inject.Inject
 import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
 import uk.gov.hmrc.mongo.MongoComponent
+import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import utils.Logger.logger
-import java.util.concurrent.TimeUnit
 
+import java.util.concurrent.TimeUnit
 import utils.PagerDutyHelper
 import utils.PagerDutyHelper.PagerDutyKeys._
 
+import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
 import javax.inject.Singleton
 
@@ -43,12 +47,14 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
     mongoComponent = mongoComponent,
     domainFormat = SDESNotificationRecord.mongoFormats,
     indexes = Seq(
-      IndexModel(
-        ascending("reference"), IndexOptions().unique(true)
-      ),
+      IndexModel(ascending("reference"), IndexOptions().unique(true)),
       IndexModel(ascending("status")),
       IndexModel(ascending("createdAt"), IndexOptions().expireAfter(appConfig.notificationTtl, TimeUnit.HOURS))
-    )) {
+    ),
+    replaceIndexes = appConfig.replaceMongoIndexes) with MongoJavatimeFormats {
+
+  implicit val dateFormat: Format[LocalDateTime] = localDateTimeFormat
+  implicit val mongoFormats: OFormat[SDESNotificationRecord] = Json.format[SDESNotificationRecord]
 
   def insertFileNotifications(records: Seq[SDESNotificationRecord]): Future[Boolean] = {
     collection.insertMany(records).toFuture().map(_.wasAcknowledged())

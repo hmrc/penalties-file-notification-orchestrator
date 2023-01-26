@@ -40,12 +40,14 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
     else servicesConfig.baseUrl("sdes")
   }
 
-  val sdesUrl: String = sdesBaseUrl + s"/notification/fileready"
+  lazy val sdesUrl: String = sdesBaseUrl + s"/notification/fileready"
 
   val auditingEnabled: Boolean = config.get[Boolean]("auditing.enabled")
   val graphiteHost: String     = config.get[String]("microservice.metrics.graphite.host")
 
-  val notificationTtl:Long = config.get[Long]("mongo-config.ttlHours")
+  lazy val notificationTtl: Long = config.get[Long]("mongo-config.ttlHours")
 
   def isFeatureSwitchEnabled(featureSwitch: FeatureSwitch): Boolean = config.get[Boolean](featureSwitch.name)
+
+  lazy val replaceMongoIndexes: Boolean = config.get[Boolean]("mongo-config.replaceIndexes")
 }

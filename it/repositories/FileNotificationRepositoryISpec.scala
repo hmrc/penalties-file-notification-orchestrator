@@ -23,9 +23,11 @@ import org.mongodb.scala.result.DeleteResult
 import org.scalatest.matchers.should.Matchers._
 import play.api.test.Helpers._
 import services.NotificationMongoService
+import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import utils.IntegrationSpecCommonBase
 
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 
 class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
@@ -104,7 +106,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
 
   "updateFileNotification" should {
     "update the file notification with the new fields for SENT notifications" in new Setup {
-      lazy val dateTimeNow: LocalDateTime = LocalDateTime.now()
+      lazy val dateTimeNow: LocalDateTime = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)
       val notificationRecordInPending: SDESNotificationRecord = SDESNotificationRecord(
         reference = "ref",
         status = RecordStatusEnum.PENDING,
