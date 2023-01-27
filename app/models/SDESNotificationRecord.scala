@@ -17,21 +17,21 @@
 package models
 
 import java.time.LocalDateTime
-
 import models.notification.{RecordStatusEnum, SDESNotification}
 import play.api.libs.json._
-
+import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 
 case class SDESNotificationRecord(reference: String,
-                                    status: RecordStatusEnum.Value = RecordStatusEnum.PENDING,
+                                  status: RecordStatusEnum.Value = RecordStatusEnum.PENDING,
                                   numberOfAttempts: Int = 0,
                                   createdAt: LocalDateTime = LocalDateTime.now(),
                                   updatedAt: LocalDateTime = LocalDateTime.now(),
                                   nextAttemptAt: LocalDateTime = LocalDateTime.now(),
-                                  notification: SDESNotification)
+                                  notification: SDESNotification
+                                 )
 
-object SDESNotificationRecord {
-
+object SDESNotificationRecord extends MongoJavatimeFormats {
+  implicit val dateFormat: Format[LocalDateTime] = localDateTimeFormat
   implicit val mongoFormats: OFormat[SDESNotificationRecord] = Json.format[SDESNotificationRecord]
 }
 

@@ -29,6 +29,7 @@ import utils.Logger.logger
 import utils.{IntegrationSpecCommonBase, LogCapturing}
 
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 import scala.concurrent.duration.DurationInt
 
 class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase with LogCapturing {
@@ -49,7 +50,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       name = "ame", location = "someUrl", checksum = SDESChecksum(algorithm = "sha", value = "256"), size = 256, properties = Seq.empty[SDESProperties]
     ), audit = SDESAudit("file 1"))
 
-  lazy val dateTimeOfNow: LocalDateTime = LocalDateTime.now()
+  lazy val dateTimeOfNow: LocalDateTime = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)
 
   val notificationRecord: SDESNotificationRecord = SDESNotificationRecord(
     reference = "ref",
