@@ -18,7 +18,7 @@ package models.auth
 
 import play.api.mvc.{Request, WrappedRequest}
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.internalauth.client.{AuthenticatedRequest, AuthorizationToken}
+import uk.gov.hmrc.internalauth.client.AuthorizationToken
 
 case class AuthRequest[A](request : Request[A],
                           headerCarrier : HeaderCarrier,
