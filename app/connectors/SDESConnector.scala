@@ -23,6 +23,7 @@ import javax.inject.Inject
 
 import scala.concurrent.{ExecutionContext, Future}
 import uk.gov.hmrc.http.HttpReads.Implicits._
+import utils.Logger.logger
 
 class SDESConnector @Inject()(config: AppConfig,
                               httpClient: HttpClient) {
@@ -33,6 +34,9 @@ class SDESConnector @Inject()(config: AppConfig,
       "Content-Type" -> "application/json"
     )
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier(authorization = Some(Authorization(config.urlHeaderAuthorisation)))
+
+    logger.info(s"Notification sent to SDES = $notification")
+    logger.info(s"Properties sent to SDES = ${notification.file.properties}")
 
     httpClient.POST[SDESNotification, HttpResponse](
       url = config.sdesUrl,
