@@ -115,7 +115,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
           val result = await(service.invoke)
           result.isLeft shouldBe true
           result.left.get shouldBe FailedToProcessNotifications
-          logs.exists(_.getMessage.equals("[SendFileNotificationsToSDESService][invoke] - Received 5xx status (500) from connector call to SDES")) shouldBe true
+          logs.exists(_.getMessage.equals("[SendFileNotificationsToSDESService][invoke] - Received 500 status code from connector call to SDES with response body: Something broke")) shouldBe true
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
           val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get
@@ -134,7 +134,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
           val result = await(service.invoke)
           result.isLeft shouldBe true
           result.left.get shouldBe FailedToProcessNotifications
-          logs.exists(_.getMessage.equals("[SendFileNotificationsToSDESService][invoke] - Received 5xx status (500) from connector call to SDES")) shouldBe true
+          logs.exists(_.getMessage.equals("[SendFileNotificationsToSDESService][invoke] - Received 500 status code from connector call to SDES with response body: Something broke")) shouldBe true
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.getPendingNotifications())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
           val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get
@@ -148,7 +148,8 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       }
     }
 
-    "process the notifications and return Left if there are failures due to 4xx response and set the records to permanent failure" in new Setup {
+    "process the notifications and return Left if there are failures due to 4xx response - increasing retries " +
+      "if below threshold (number of attempts = 1)" in new Setup {
       SDESStub.failedStubResponse(BAD_REQUEST)
       await(notificationRepo.insertFileNotifications(pendingNotifications))
       withCaptureOfLoggingFrom(logger) {
@@ -156,7 +157,33 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
           val result = await(service.invoke)
           result.isLeft shouldBe true
           result.left.get shouldBe FailedToProcessNotifications
-          logs.exists(_.getMessage.contains(s"[SendFileNotificationsToSDESService][invoke] - Received 4xx status (400) from connector call to SDES")) shouldBe true
+          logs.exists(_.getMessage.contains(s"[SendFileNotificationsToSDESService][invoke] - Received 400 status code from connector call to SDES with response body: Something broke")) shouldBe true
+          val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
+          val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
+          val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get
+          firstNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true
+          secondNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true
+          firstNotification.numberOfAttempts shouldBe 2
+          secondNotification.numberOfAttempts shouldBe 2
+        }
+      }
+    }
+
+    "process the notifications and return Left if there are failures due to 4xx response - setting permanent failure if the retry threshold " +
+      "is met" in new Setup {
+      val pendingNotificationsNearThreshold = Seq(
+        notificationRecord.copy(numberOfAttempts = 5),
+        notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, numberOfAttempts = 5),
+        notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2))
+      )
+      SDESStub.failedStubResponse(BAD_REQUEST)
+      await(notificationRepo.insertFileNotifications(pendingNotificationsNearThreshold))
+      withCaptureOfLoggingFrom(logger) {
+        logs => {
+          val result = await(service.invoke)
+          result.isLeft shouldBe true
+          result.left.get shouldBe FailedToProcessNotifications
+          logs.exists(_.getMessage.equals("[SendFileNotificationsToSDESService][invoke] - Received 400 status code from connector call to SDES with response body: Something broke")) shouldBe true
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
           val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get

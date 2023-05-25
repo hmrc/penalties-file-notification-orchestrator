@@ -33,10 +33,10 @@ class SDESConnector @Inject()(config: AppConfig,
       "Content-Type" -> "application/json"
     )
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier(authorization = Some(Authorization(config.urlHeaderAuthorisation)))
-
     httpClient.POST[SDESNotification, HttpResponse](
       url = config.sdesUrl,
       body = notification,
-      headers = sdesHeaders)
+      headers = sdesHeaders
+    )
   }
 }
