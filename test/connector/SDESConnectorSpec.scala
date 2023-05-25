@@ -32,11 +32,18 @@ class SDESConnectorSpec extends SpecBase {
   val mockHttpClient: HttpClient = mock(classOf[HttpClient])
   val mockAppConfig: AppConfig = mock(classOf[AppConfig])
 
-  val notification: SDESNotification = SDESNotification(informationType = "info",
+  val notification: SDESNotification = SDESNotification(
+    informationType = "info",
     file = SDESNotificationFile(
       recipientOrSender = "penalties",
-      name = "ame", location = "someUrl", checksum = SDESChecksum(algorithm = "sha", value = "256"), size = 256, properties = Seq.empty[SDESProperties]
-    ), audit = SDESAudit("file 1"))
+      name = "name",
+      location = "someUrl",
+      checksum = SDESChecksum(algorithm = "sha-256", value = "some-sha-256-value"),
+      size = 256,
+      properties = Seq.empty[SDESProperties]
+    ),
+    audit = SDESAudit("file 1")
+  )
 
   class Setup {
     reset(mockAppConfig, mockHttpClient)

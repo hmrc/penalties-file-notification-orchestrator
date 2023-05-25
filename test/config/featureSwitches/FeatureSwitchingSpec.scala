@@ -35,12 +35,16 @@ class FeatureSwitchingSpec extends SpecBase with BeforeAndAfterAll with FeatureS
     val featureSwitching: FeatureSwitching = new FeatureSwitching {
       override implicit val appConfig: AppConfig = config
     }
-    sys.props -= UseInternalAuth.name
+    FeatureSwitch.listOfAllFeatureSwitches.foreach(
+      featureSwitch => sys.props -= featureSwitch.name
+    )
   }
 
   override protected def afterAll(): Unit = {
     super.afterAll()
-    sys.props -= UseInternalAuth.name
+    FeatureSwitch.listOfAllFeatureSwitches.foreach(
+      featureSwitch => sys.props -= featureSwitch.name
+    )
   }
 
   "constants" should {
@@ -69,16 +73,24 @@ class FeatureSwitchingSpec extends SpecBase with BeforeAndAfterAll with FeatureS
   }
 
   "enableFeatureSwitch" should {
-    s"set ${UseInternalAuth.name} property to true" in new Setup {
-      featureSwitching.enableFeatureSwitch(UseInternalAuth)
-      sys.props.get(UseInternalAuth.name).get shouldBe "true"
-    }
+    FeatureSwitch.listOfAllFeatureSwitches.foreach(
+      featureSwitch => {
+        s"set ${featureSwitch.name} property to true" in new Setup {
+          featureSwitching.enableFeatureSwitch(featureSwitch)
+          sys.props.get(featureSwitch.name).get shouldBe "true"
+        }
+      }
+    )
   }
 
   "disableFeatureSwitch" should {
-    s"set ${UseInternalAuth.name} property to false" in new Setup {
-      featureSwitching.disableFeatureSwitch(UseInternalAuth)
-      sys.props.get(UseInternalAuth.name).get shouldBe "false"
-    }
+    FeatureSwitch.listOfAllFeatureSwitches.foreach(
+      featureSwitch => {
+        s"set ${featureSwitch.name} property to false" in new Setup {
+          featureSwitching.disableFeatureSwitch(featureSwitch)
+          sys.props.get(featureSwitch.name).get shouldBe "false"
+        }
+      }
+    )
   }
 }

@@ -29,29 +29,26 @@ class NotificationMongoServiceSpec extends SpecBase {
   val mockRepo: FileNotificationRepository = mock(classOf[FileNotificationRepository])
 
   class Setup {
-    val service = new NotificationMongoService(
-      mockRepo
-    )
-
+    val service = new NotificationMongoService(mockRepo)
     reset(mockRepo)
   }
 
-  val seqToPassToService = Seq(
+  val fileNotifications: Seq[SDESNotification] = Seq(
     SDESNotification(
       informationType = "type",
       file = SDESNotificationFile(
         recipientOrSender = "recipient",
-        name = "John Doe",
-        location = "place",
+        name = "file1.txt",
+        location = "http://example.com",
         checksum = SDESChecksum(
-          algorithm = "beep",
-          value = "abc"
+          algorithm = "SHA-256",
+          value = "123456789-abcdef-123456789"
         ),
         size = 1,
         properties = Seq(
           SDESProperties(
             name = "name",
-            value = "xyz"
+            value = "value"
           ))
       ),
       audit = SDESAudit(
@@ -63,13 +60,13 @@ class NotificationMongoServiceSpec extends SpecBase {
   "insertNotificationRecordsIntoMongo" should {
     "call the repository and return true when successfully inserted" in new Setup {
       when(mockRepo.insertFileNotifications(Matchers.any())).thenReturn(Future.successful(true))
-      val result: Boolean = await(service.insertNotificationRecordsIntoMongo(seqToPassToService))
+      val result: Boolean = await(service.insertNotificationRecordsIntoMongo(fileNotifications))
       result shouldBe true
     }
 
     "call the repository and return false when unsuccessful" in new Setup {
       when(mockRepo.insertFileNotifications(Matchers.any())).thenReturn(Future.successful(false))
-      val result: Boolean = await(service.insertNotificationRecordsIntoMongo(seqToPassToService))
+      val result: Boolean = await(service.insertNotificationRecordsIntoMongo(fileNotifications))
       result shouldBe false
     }
   }
