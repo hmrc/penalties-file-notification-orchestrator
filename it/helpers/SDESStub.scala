@@ -30,6 +30,6 @@ object SDESStub {
   def failedStubResponse(statusCode: Int): StubMapping = stubFor(post(urlEqualTo("/penalties-stub/notification/fileready")).willReturn(
     aResponse()
       .withStatus(statusCode)
-      .withBody("")
+      .withBody("Something broke")
   ))
 }
