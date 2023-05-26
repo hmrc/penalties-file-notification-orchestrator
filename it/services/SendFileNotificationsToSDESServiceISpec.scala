@@ -44,12 +44,6 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
     await(lockRepository.collection.countDocuments().toFuture()) shouldBe 0
   }
 
-  val notification1: SDESNotification = SDESNotification(informationType = "info",
-    file = SDESNotificationFile(
-      recipientOrSender = "penalties",
-      name = "ame", location = "someUrl", checksum = SDESChecksum(algorithm = "sha", value = "256"), size = 256, properties = Seq.empty[SDESProperties]
-    ), audit = SDESAudit("file 1"))
-
   lazy val dateTimeOfNow: LocalDateTime = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)
 
   val notificationRecord: SDESNotificationRecord = SDESNotificationRecord(
@@ -59,10 +53,10 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
     createdAt = LocalDateTime.of(2020,1,1,1,1),
     updatedAt = LocalDateTime.of(2020,2,2,2,2),
     nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
-    notification = notification1
+    notification = sampleNotification
   )
 
-  val pendingNotifications = Seq(
+  val pendingNotifications: Seq[SDESNotificationRecord] = Seq(
     notificationRecord,
     notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, nextAttemptAt = LocalDateTime.of(2020,3,3,3,3)),
     notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2))
@@ -103,7 +97,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
 
     "process the notifications and return Left if there are failures due to 5xx response - setting permanent failure if the retry threshold " +
       "is met" in new Setup {
-      val pendingNotificationsNearThreshold = Seq(
+      val pendingNotificationsNearThreshold: Seq[SDESNotificationRecord] = Seq(
         notificationRecord.copy(numberOfAttempts = 5),
         notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, numberOfAttempts = 5),
         notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2))

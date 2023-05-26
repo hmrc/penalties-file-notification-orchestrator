@@ -52,17 +52,17 @@ class OrchestratorControllerISpec extends IntegrationSpecCommonBase with LogCapt
       |   "informationType": "type",
       |   "file": {
       |       "recipientOrSender": "recipient",
-      |       "name": "John Doe",
-      |       "location": "place",
+      |       "name": "file1.txt",
+      |       "location": "http://example.com",
       |       "checksum": {
-      |           "algorithm": "beep",
-      |           "value": "abc"
+      |           "algorithm": "SHA-256",
+      |           "value": "123456789-abcdef-123456789"
       |       },
       |       "size": 1,
       |       "properties": [
       |       {
-      |           "name": "name",
-      |           "value": "xyz"
+      |           "name": "name1",
+      |           "value": "value1"
       |       }]
       |   },
       |   "audit": {
@@ -74,7 +74,7 @@ class OrchestratorControllerISpec extends IntegrationSpecCommonBase with LogCapt
 
   "receiveSDESNotifications" when {
     "the caller is authorised" should {
-      "call FileNotificationRepositories - returns OK" in new Setup {
+      "return OK - when the notification is inserted successfully" in new Setup {
         AuthStub.authorised()
         val result: WSResponse = await(buildClientForRequestToApp(uri = "/new-notifications").post(
           jsonToReceive
@@ -112,17 +112,17 @@ class OrchestratorControllerISpec extends IntegrationSpecCommonBase with LogCapt
               |   "informationType": "type",
               |   "file": {
               |       "recipientOrSender": "recipient",
-              |       "name": "John Doe",
-              |       "location": "place",
+              |       "name": "file2.txt",
+              |       "location": "http://example.com/file2.txt",
               |       "checksum": {
-              |           "algorithm": "beep",
-              |           "value": "abc"
+              |           "algorithm": "SHA-256",
+              |           "value": "123456789-abcdef-123456789"
               |       },
               |       "size": 1,
               |       "properties": [
               |       {
-              |           "name": "name",
-              |           "value": "xyz"
+              |           "name": "name2",
+              |           "value": "value2"
               |       }]
               |   },
               |   "audit": {
@@ -133,17 +133,17 @@ class OrchestratorControllerISpec extends IntegrationSpecCommonBase with LogCapt
               |   "informationType": "type",
               |   "file": {
               |       "recipientOrSender": "recipient",
-              |       "name": "John Doe",
-              |       "location": "place",
+              |       "name": "file1.txt",
+              |       "location": "http://example.com/file1.txt",
               |       "checksum": {
-              |           "algorithm": "beep",
-              |           "value": "abc"
+              |           "algorithm": "SHA-256",
+              |           "value": "123456789-abcdef-123456789"
               |       },
               |       "size": 1,
               |       "properties": [
               |       {
-              |           "name": "name",
-              |           "value": "xyz"
+              |           "name": "name1",
+              |           "value": "value1"
               |       }]
               |   },
               |   "audit": {
@@ -158,9 +158,7 @@ class OrchestratorControllerISpec extends IntegrationSpecCommonBase with LogCapt
                 jsonToReceiveWithDuplicateCorrelationID
               ))
               result.status shouldBe INTERNAL_SERVER_ERROR
-              eventually {
-                logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_INSERT_SDES_NOTIFICATION))
-              }
+              logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_INSERT_SDES_NOTIFICATION.toString)) shouldBe true
             }
           }
         }

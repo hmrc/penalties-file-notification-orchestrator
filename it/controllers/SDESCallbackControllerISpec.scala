@@ -28,28 +28,27 @@ class SDESCallbackControllerISpec extends IntegrationSpecCommonBase{
 
   val sdesCallbackJson: JsValue = Json.parse(
     s"""
-       | {
-       |            "notification": "FileReady",
-       |            "filename": "axyz.doc",
-       |            "checksumAlgorithm": "MD5",
-       |            "checksum": "c6779ec2960296ed9a04f08d67f64422",
-       |            "correlationID":"545d0831-d4ba-408d-b1f1-f4645efb32fd",
-       |            "availableUntil": "2021-01-06T10:01:00.889Z",
-       |            "failureReason": "Virus Detected",
-       |            "dateTime": "2021-01-01T10:01:00.889Z",
-       |            "properties": [
-       |                {
-       |                    "name": "name1",
-       |                    "value": "value1"
-       |                }
-       |            ]
-       |        }
+       |{
+       |  "notification": "FileReady",
+       |  "filename": "axyz.doc",
+       |  "checksumAlgorithm": "MD5",
+       |  "checksum": "c6779ec2960296ed9a04f08d67f64422",
+       |  "correlationID":"545d0831-d4ba-408d-b1f1-f4645efb32fd",
+       |  "availableUntil": "2021-01-06T10:01:00.889Z",
+       |  "failureReason": "Virus Detected",
+       |  "dateTime": "2021-01-01T10:01:00.889Z",
+       |  "properties": [
+       |  {
+       |    "name": "name1",
+       |    "value": "value1"
+       |  }]
+       |}
        |""".stripMargin
   )
 
   "handleCallback" should {
     "return NO_CONTENT (204)" when {
-      "sdesCallBack is a valid JSON" in {
+      "the callback has a valid JSON body" in {
         val result: WSResponse = await(buildClientForRequestToApp(uri = "/sdes-callback").post(
           sdesCallbackJson
         ))
