@@ -54,12 +54,6 @@ class MonitoringJobServiceISpec extends IntegrationSpecCommonBase with LogCaptur
     }
   }
 
-  val notification1: SDESNotification = SDESNotification(informationType = "info",
-    file = SDESNotificationFile(
-      recipientOrSender = "penalties",
-      name = "ame", location = "someUrl", checksum = SDESChecksum(algorithm = "sha", value = "256"), size = 256, properties = Seq.empty[SDESProperties]
-    ), audit = SDESAudit("file 1"))
-
   val pendingNotificationRecord: SDESNotificationRecord = SDESNotificationRecord(
     reference = "ref",
     status = RecordStatusEnum.PENDING,
@@ -67,7 +61,7 @@ class MonitoringJobServiceISpec extends IntegrationSpecCommonBase with LogCaptur
     createdAt = LocalDateTime.of(2020,1,1,1,1),
     updatedAt = LocalDateTime.of(2020,2,2,2,2),
     nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
-    notification = notification1
+    notification = sampleNotification
   )
 
   val sentNotificationRecord: SDESNotificationRecord = pendingNotificationRecord.copy(reference = "ref2", status = RecordStatusEnum.SENT)

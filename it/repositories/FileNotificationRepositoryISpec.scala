@@ -44,13 +44,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
     await(deleteAll())
   }
 
-  val notification1: SDESNotification = SDESNotification(informationType = "info",
-    file = SDESNotificationFile(
-      recipientOrSender = "penalties",
-      name = "ame", location = "someUrl", checksum = SDESChecksum(algorithm = "sha", value = "256"), size = 256, properties = Seq.empty[SDESProperties]
-    ), audit = SDESAudit("file 1"))
-
-  val notification2: SDESNotification = notification1.copy(audit = SDESAudit("File 2"))
+  val sampleNotification2: SDESNotification = sampleNotification.copy(audit = SDESAudit("987654321-abcdefgh-123456789"))
 
   val notificationRecord: SDESNotificationRecord = SDESNotificationRecord(
     reference = "ref",
@@ -59,16 +53,15 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
     createdAt = LocalDateTime.of(2020,1,1,1,1),
     updatedAt = LocalDateTime.of(2020,2,2,2,2),
     nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
-    notification = notification1
+    notification = sampleNotification
   )
 
-  val notificationRecord2 = notificationRecord.copy(reference = "ref2", notification = notification2)
+  val notificationRecord2: SDESNotificationRecord = notificationRecord.copy(reference = "ref2", notification = sampleNotification2)
 
   "insertFileNotifications" should {
     "insert a single notification received from the backend" in new Setup{
       val result: Boolean = await(repository.insertFileNotifications(Seq(notificationRecord)))
       result shouldBe true
-
       val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().toFuture)
       recordsInMongoAfterInsertion.size shouldBe 1
       recordsInMongoAfterInsertion.head shouldBe notificationRecord
@@ -77,7 +70,6 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
     "insert multiple notifications received from the backend" in new Setup {
       val result: Boolean = await(repository.insertFileNotifications(Seq(notificationRecord, notificationRecord2)))
       result shouldBe true
-
       val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().toFuture)
       recordsInMongoAfterInsertion.size shouldBe 2
       recordsInMongoAfterInsertion.head shouldBe notificationRecord
@@ -94,7 +86,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
         createdAt = LocalDateTime.of(2020,1,1,1,1),
         updatedAt = LocalDateTime.of(2020,2,2,2,2),
         nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
-        notification = notification1
+        notification = sampleNotification
       )
       val notificationRecord2: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref2", status = RecordStatusEnum.PENDING)
       val notificationRecord3: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref3", status = RecordStatusEnum.SENT)
@@ -114,7 +106,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
         createdAt = LocalDateTime.of(2020,1,1,1,1),
         updatedAt = LocalDateTime.of(2020,2,2,2,2),
         nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
-        notification = notification1
+        notification = sampleNotification
       )
       val updatedNotification: SDESNotificationRecord = notificationRecordInPending.copy(
         status = RecordStatusEnum.SENT,
@@ -137,7 +129,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
         createdAt = LocalDateTime.of(2020,1,1,1,1),
         updatedAt = LocalDateTime.of(2020,2,2,2,2),
         nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
-        notification = notification1
+        notification = sampleNotification
       )
 
       val notificationRecordInSent: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref1",

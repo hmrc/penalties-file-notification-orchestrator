@@ -18,6 +18,7 @@ package utils
 
 import com.codahale.metrics.SharedMetricRegistries
 import helpers.WiremockHelper
+import models.notification.{SDESAudit, SDESChecksum, SDESNotification, SDESNotificationFile, SDESProperties}
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, TestSuite}
 import org.scalatestplus.play.guice.GuiceOneServerPerSuite
@@ -75,4 +76,20 @@ trait IntegrationSpecCommonBase extends AnyWordSpec with GuiceOneServerPerSuite 
   def buildClientForRequestToApp(baseUrl: String = "/penalties-file-notification-orchestrator", uri: String): WSRequest = {
     ws.url(s"http://localhost:$port$baseUrl$uri").withFollowRedirects(false).addHttpHeaders("Authorization" -> "Token some-token")
   }
+
+  val sampleNotification: SDESNotification = SDESNotification(
+    informationType = "info",
+    file = SDESNotificationFile(
+      recipientOrSender = "penalties",
+      name = "file1.txt",
+      location = "http://example.com",
+      checksum = SDESChecksum(
+        algorithm = "SHA-256",
+        value = "abcdef-123456789-abcdef"
+      ),
+      size = 256,
+      properties = Seq.empty[SDESProperties]
+    ),
+    audit = SDESAudit("123456789-abcdefgh-987654321")
+  )
 }
