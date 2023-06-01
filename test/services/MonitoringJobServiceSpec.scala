@@ -89,9 +89,7 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
         .thenReturn(Future.successful(true))
       when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.successful(()))
-
       await(service.tryLock(expectingResult)) shouldBe Right(Seq.empty)
-
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
@@ -102,11 +100,9 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
         .thenReturn(Future.successful(false))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Right(Seq(s"$jobName - JobAlreadyRunning"))
-
         capturedLogEvents.exists(_.getMessage == s"[$jobName] Locked because it might be running on another instance") shouldBe true
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Locked because it might be running on another instance") shouldBe true
       }
-
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(0)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }
@@ -125,7 +121,6 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
           capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION))
         }
       }
-
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
     }

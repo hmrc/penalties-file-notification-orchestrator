@@ -27,36 +27,36 @@ class SDESCallbackSpec extends AnyWordSpec with Matchers {
 
   val sdesCallbackJson: JsValue = Json.parse(
     """
-      | {
-      |            "notification": "FileReady",
-      |            "filename": "axyz.doc",
-      |            "checksumAlgorithm": "MD5",
-      |            "checksum": "c6779ec2960296ed9a04f08d67f64422",
-      |            "correlationID":"545d0831-d4ba-408d-b1f1-f4645efb32fd",
-      |            "availableUntil": "2021-01-06T10:01:00.889Z",
-      |            "failureReason": "Virus Detected",
-      |            "dateTime": "2021-01-01T10:01:00.889Z",
-      |            "properties": [
-      |                {
-      |                    "name": "name1",
-      |                    "value": "value1"
-      |                },
-      |                {
-      |                    "name": "name2",
-      |                    "value": "value2"
-      |                }
-      |            ]
-      |        }
+      |{
+      |   "notification": "FileReady",
+      |   "filename": "axyz.doc",
+      |   "checksumAlgorithm": "MD5",
+      |   "checksum": "c6779ec2960296ed9a04f08d67f64422",
+      |   "correlationID":"545d0831-d4ba-408d-b1f1-f4645efb32fd",
+      |   "availableUntil": "2021-01-06T10:01:00.889Z",
+      |   "failureReason": "Virus Detected",
+      |   "dateTime": "2021-01-01T10:01:00.889Z",
+      |   "properties": [
+      |     {
+      |       "name": "name1",
+      |       "value": "value1"
+      |     },
+      |     {
+      |       "name": "name2",
+      |       "value": "value2"
+      |     }
+      |   ]
+      |}
       |""".stripMargin)
 
   val sdesCallbackJsonWithoutOptionalValues: JsValue = Json.parse(
     """
-      | {
-      |            "notification": "FileReady",
-      |            "filename": "axyz.doc",
-      |            "correlationID":"545d0831-d4ba-408d-b1f1-f4645efb32fd",
-      |            "dateTime": "2021-01-01T10:01:00.889Z"
-      |        }
+      |{
+      |   "notification": "FileReady",
+      |   "filename": "axyz.doc",
+      |   "correlationID":"545d0831-d4ba-408d-b1f1-f4645efb32fd",
+      |   "dateTime": "2021-01-01T10:01:00.889Z"
+      |}
       |""".stripMargin)
 
   val sdesCallBackModel: SDESCallback = SDESCallback(
@@ -69,7 +69,7 @@ class SDESCallbackSpec extends AnyWordSpec with Matchers {
     failureReason = Some("Virus Detected"),
     dateTime = Some(LocalDateTime.of(2021, 1, 1, 10, 1, 0).plus(889, ChronoUnit.MILLIS)),
     properties = Some(Seq(Properties(name = "name1", value = "value1"),
-                          Properties(name = "name2", value = "value2")))
+      Properties(name = "name2", value = "value2")))
   )
 
   val sdesCallBackModelWithRequiredValues: SDESCallback = SDESCallback(

@@ -63,17 +63,17 @@ class OrchestratorControllerSpec extends SpecBase with LogCapturing {
       informationType = "type",
       file = SDESNotificationFile(
         recipientOrSender = "recipient",
-        name = "John Doe",
-        location = "place",
+        name = "file1.txt",
+        location = "http://example.com",
         checksum = SDESChecksum(
-          algorithm = "beep",
-          value = "abc"
+          algorithm = "SHA-256",
+          value = "1345678-246475-fefweswr3234-e23lkmr32m"
         ),
         size = 1,
         properties = Seq(
           SDESProperties(
             name = "name",
-            value = "xyz"
+            value = "value"
         ))
       ),
       audit = SDESAudit(
@@ -88,17 +88,17 @@ class OrchestratorControllerSpec extends SpecBase with LogCapturing {
       |   "informationType": "type",
       |   "file": {
       |       "recipientOrSender": "recipient",
-      |       "name": "John Doe",
-      |       "location": "place",
+      |       "name": "file1.txt",
+      |       "location": "http://example.com",
       |       "checksum": {
-      |           "algorithm": "beep",
-      |           "value": "abc"
+      |           "algorithm": "SHA-256",
+      |           "value": "1345678-246475-fefweswr3234-e23lkmr32m"
       |       },
       |       "size": 1,
       |       "properties": [
       |       {
       |           "name": "name",
-      |           "value": "xyz"
+      |           "value": "value"
       |       }]
       |   },
       |   "audit": {
@@ -138,8 +138,8 @@ class OrchestratorControllerSpec extends SpecBase with LogCapturing {
             |   "informationType": "type",
             |   "file": {
             |       "recipientOrSender": "recipient",
-            |       "name": "John Doe",
-            |       "location": "place"
+            |       "name": "file1.txt",
+            |       "location": "http://example.com"
             |   }
             |}]
             |""".stripMargin

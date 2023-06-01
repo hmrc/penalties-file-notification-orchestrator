@@ -44,19 +44,25 @@ class FeatureSwitchSpec extends SpecBase {
     }
   }
 
-  "return true if UseInternalAuth feature switch is enabled" in new Setup {
-    featureSwitching.enableFeatureSwitch(UseInternalAuth)
-    featureSwitching.isEnabled(UseInternalAuth) shouldBe true
-  }
+  "FeatureSwitching isEnabled" should {
+    FeatureSwitch.listOfAllFeatureSwitches.foreach(
+      featureSwitch => {
+        s"return true if ${featureSwitch.name} feature switch is enabled" in new Setup {
+          featureSwitching.enableFeatureSwitch(featureSwitch)
+          featureSwitching.isEnabled(featureSwitch) shouldBe true
+        }
 
-  "return false if UseInternalAuth feature switch is disabled" in new Setup {
-    featureSwitching.disableFeatureSwitch(UseInternalAuth)
-    featureSwitching.isEnabled(UseInternalAuth) shouldBe false
-  }
+        s"return false if ${featureSwitch.name} feature switch is disabled" in new Setup {
+          featureSwitching.disableFeatureSwitch(featureSwitch)
+          featureSwitching.isEnabled(featureSwitch) shouldBe false
+        }
 
-  "return true if UseInternalAuth feature switch does not exist in cache but does in config" in new Setup {
-    when(mockAppConfig.isFeatureSwitchEnabled(Matchers.eq(UseInternalAuth)))
-      .thenReturn(true)
-    featureSwitching.isEnabled(UseInternalAuth) shouldBe true
+        s"return true if ${featureSwitch.name} feature switch does not exist in cache but does in config" in new Setup {
+          when(mockAppConfig.isFeatureSwitchEnabled(Matchers.eq(featureSwitch)))
+            .thenReturn(true)
+          featureSwitching.isEnabled(featureSwitch) shouldBe true
+        }
+      }
+    )
   }
 }

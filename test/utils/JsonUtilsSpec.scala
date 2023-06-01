@@ -20,14 +20,16 @@ import base.SpecBase
 import play.api.libs.json.JsObject
 
 class JsonUtilsSpec extends SpecBase {
+
   object TestHarness extends JsonUtils
+
   "jsonObjNoNulls" should {
     "filter out any None objects" in {
       val result: JsObject = TestHarness.jsonObjNoNulls(
-        "None" -> None,
+        "this-should-be-none" -> None,
         "foo" -> "bar"
       )
-      (result \ "None").isEmpty shouldBe true
+      (result \ "this-should-be-none").isEmpty shouldBe true
       (result \ "foo").validate[String].get shouldBe "bar"
     }
   }

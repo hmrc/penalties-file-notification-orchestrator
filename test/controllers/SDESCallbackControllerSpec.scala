@@ -44,40 +44,40 @@ class SDESCallbackControllerSpec extends SpecBase with LogCapturing {
   }
 
   val sdesCallbackModel: SDESCallback = SDESCallback(
-      SDESFileNotificationEnum.FileReady,
-      "axyz.doc",
-      Some("MD5"),
-      Some("c6779ec2960296ed9a04f08d67f64422"),
-      "545d0831-d4ba-408d-b1f1-f4645efb32fd",
-      Some(LocalDateTime.of(2021, 1, 6, 10, 1, 0).plus(889, ChronoUnit.MILLIS)),
-      Some("Virus Detected"),
-      Some(LocalDateTime.of(2021, 1, 1, 10, 1, 0).plus(889, ChronoUnit.MILLIS)),
-      Some(Seq(Properties("name1", "value1")))
+      notification = SDESFileNotificationEnum.FileReady,
+      filename = "axyz.doc",
+      checksumAlgorithm = Some("SHA-256"),
+      checksum = Some("c6779ec2960296ed9a04f08d67f64422"),
+      correlationID = "545d0831-d4ba-408d-b1f1-f4645efb32fd",
+      availableUntil = Some(LocalDateTime.of(2021, 1, 6, 10, 1, 0).plus(889, ChronoUnit.MILLIS)),
+      failureReason = Some("Virus Detected"),
+      dateTime = Some(LocalDateTime.of(2021, 1, 1, 10, 1, 0).plus(889, ChronoUnit.MILLIS)),
+      properties = Some(Seq(Properties("name1", "value1")))
     )
 
   val sdesCallbackJson: JsValue = Json.parse(
     s"""
-       | {
-       |            "notification": "FileReady",
-       |            "filename": "axyz.doc",
-       |            "checksumAlgorithm": "MD5",
-       |            "checksum": "c6779ec2960296ed9a04f08d67f64422",
-       |            "correlationID":"545d0831-d4ba-408d-b1f1-f4645efb32fd",
-       |            "availableUntil": "2021-01-06T10:01:00.889Z",
-       |            "failureReason": "Virus Detected",
-       |            "dateTime": "2021-01-01T10:01:00.889Z",
-       |            "properties": [
-       |                {
+       |{
+       |  "notification": "FileReady",
+       |  "filename": "axyz.doc",
+       |  "checksumAlgorithm": "SHA-256",
+       |  "checksum": "c6779ec2960296ed9a04f08d67f64422",
+       |  "correlationID":"545d0831-d4ba-408d-b1f1-f4645efb32fd",
+       |  "availableUntil": "2021-01-06T10:01:00.889Z",
+       |  "failureReason": "Virus Detected",
+       |  "dateTime": "2021-01-01T10:01:00.889Z",
+       |  "properties": [
+       |    {
        |                    "name": "name1",
        |                    "value": "value1"
-       |                }
-       |            ]
-       |        }
+       |    }
+       |  ]
+       |}
        |""".stripMargin
   )
 
   "receiveSDESCallback" should {
-    "return content string for Valid sdesCallback JSON Body" when {
+    "return content string for Valid SDES callback JSON Body" when {
       "the JSON request body is valid" in new Setup {
         val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(sdesCallbackJson))
         verify(mockAuditService)
@@ -86,7 +86,7 @@ class SDESCallbackControllerSpec extends SpecBase with LogCapturing {
       }
     }
 
-    "return content string for Invalid sdesCallback JSON Body" when {
+    "return content string for Invalid SDES callback JSON Body" when {
       "the JSON request body is invalid " in new Setup {
         withCaptureOfLoggingFrom(logger) {
           logs => {
@@ -100,21 +100,20 @@ class SDESCallbackControllerSpec extends SpecBase with LogCapturing {
         }
       }
 
-      "the sdesCallback JSON body is valid but can not be serialised to a model" in new Setup {
+      "the SDES callback JSON body is valid but can not be serialised to a model" in new Setup {
         val invalidBody: JsValue = Json.parse(
           s"""
             |[{
-            |    "notification": "FileReady",
-            |     "filename": "axyz.doc",
-            |     "checksumAlgorithm": "MD5",
-            |     "checksum": "c6779ec2960296ed9a04f08d67f64422",
-            |      "correlationID":"545d0831-d4ba-408d-b1f1-f4645efb32fd",
-            |      "availableUntil": "2021-01-06T10:01:00.889Z",
-            |      "properties": [
-            |                {
-            |                    "name": "name1"
-            |                }
-            |            ]
+            |   "notification": "FileReady",
+            |   "filename": "axyz.doc",
+            |   "checksumAlgorithm": "MD5",
+            |   "checksum": "c6779ec2960296ed9a04f08d67f64422",
+            |   "correlationID":"545d0831-d4ba-408d-b1f1-f4645efb32fd",
+            |   "availableUntil": "2021-01-06T10:01:00.889Z",
+            |   "properties": [
+            |   {
+            |     "name": "name1"
+            |   }]
             |}]
             |""".stripMargin
         )
