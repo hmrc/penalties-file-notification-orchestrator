@@ -65,7 +65,6 @@ trait IntegrationSpecCommonBase extends AnyWordSpec with GuiceOneServerPerSuite 
         "microservice.services.sdes.host" -> stubHost,
         "microservice.services.penalties-stub.port" -> stubPort,
         "microservice.services.internal-auth.port" -> stubPort,
-        "sdes.srn" -> stubSRN,
         "feature-switch.use-internal-auth" -> true
       )
     )
