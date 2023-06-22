@@ -46,7 +46,7 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
     indexes = Seq(
       IndexModel(ascending("reference"), IndexOptions().unique(true)),
       IndexModel(ascending("status")),
-      IndexModel(ascending("createdAt"), IndexOptions().expireAfter(appConfig.notificationTtl, TimeUnit.HOURS))
+      IndexModel(ascending("createdAt"), IndexOptions().expireAfter(appConfig.notificationTtl, TimeUnit.DAYS))
     )) with MongoJavatimeFormats {
 
   implicit val dateFormat: Format[LocalDateTime] = localDateTimeFormat
