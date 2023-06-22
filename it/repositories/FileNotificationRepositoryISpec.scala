@@ -17,7 +17,7 @@
 package repositories
 
 import models.SDESNotificationRecord
-import models.notification._
+import models.notification.{RecordStatusEnum, _}
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.result.DeleteResult
 import org.scalatest.matchers.should.Matchers._
@@ -78,7 +78,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
   }
 
   "getPendingNotifications" should {
-    "get all the notifications with the PENDING status only" in new Setup {
+    "get all the notifications in PENDING or FAILED_PENDING_RETRY or NOT_PROCESSED_PENDING_RETRY status" in new Setup {
       val notificationRecordInPending: SDESNotificationRecord = SDESNotificationRecord(
         reference = "ref",
         status = RecordStatusEnum.PENDING,
@@ -89,11 +89,36 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
         notification = sampleNotification
       )
       val notificationRecord2: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref2", status = RecordStatusEnum.PENDING)
+      val notificationRecordPendingRetry: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref4", status = RecordStatusEnum.FAILED_PENDING_RETRY)
+      val notificationRecordNotProcessedPendingRetry: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref5", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
       val notificationRecord3: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref3", status = RecordStatusEnum.SENT)
-      await(repository.insertFileNotifications(Seq(notificationRecordInPending, notificationRecord2, notificationRecord3)))
+      await(repository.insertFileNotifications(Seq(notificationRecordInPending, notificationRecord2, notificationRecord3, notificationRecordPendingRetry,
+        notificationRecordNotProcessedPendingRetry)))
       val result = await(repository.getPendingNotifications())
-      result shouldBe Seq(notificationRecordInPending, notificationRecord2)
+      result shouldBe Seq(notificationRecordPendingRetry, notificationRecordNotProcessedPendingRetry, notificationRecordInPending, notificationRecord2)
     }
+
+    def onlyStatusTest(status: RecordStatusEnum.Value): Unit = {
+      s"get all the notifications in $status status (if they are the only records)" in new Setup {
+        val notificationRecordInPending: SDESNotificationRecord = SDESNotificationRecord(
+          reference = "ref",
+          status = status,
+          numberOfAttempts = 1,
+          createdAt = LocalDateTime.of(2020, 1, 1, 1, 1),
+          updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2),
+          nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3),
+          notification = sampleNotification
+        )
+        val notificationRecord2: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref3", status = RecordStatusEnum.SENT)
+        await(repository.insertFileNotifications(Seq(notificationRecordInPending, notificationRecord2)))
+        val result = await(repository.getPendingNotifications())
+        result shouldBe Seq(notificationRecordInPending)
+      }
+    }
+
+    onlyStatusTest(RecordStatusEnum.PENDING)
+    onlyStatusTest(RecordStatusEnum.FAILED_PENDING_RETRY)
+    onlyStatusTest(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
   }
 
   "updateFileNotification" should {

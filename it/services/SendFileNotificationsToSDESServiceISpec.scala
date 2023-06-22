@@ -59,7 +59,9 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
   val pendingNotifications: Seq[SDESNotificationRecord] = Seq(
     notificationRecord,
     notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, nextAttemptAt = LocalDateTime.of(2020,3,3,3,3)),
-    notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2))
+    notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2)),
+    notificationRecord.copy(reference = "ref3", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3), status = RecordStatusEnum.FAILED_PENDING_RETRY),
+    notificationRecord.copy(reference = "ref4", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3), status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
   )
 
   "tryLock" should {
@@ -92,7 +94,9 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       notificationsInRepo.exists(_.equals(notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2)))) shouldBe true
       notificationsInRepo.find(_.reference == "ref1").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
       notificationsInRepo.find(_.reference == "ref").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
-      notificationsInRepo.count(_.status == RecordStatusEnum.SENT) shouldBe 2
+      notificationsInRepo.find(_.reference == "ref3").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
+      notificationsInRepo.find(_.reference == "ref4").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
+      notificationsInRepo.count(_.status == RecordStatusEnum.SENT) shouldBe 4
     }
 
     "process the notifications and return Left if there are failures due to 5xx response - setting permanent failure if the retry threshold " +
@@ -100,6 +104,8 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       val pendingNotificationsNearThreshold: Seq[SDESNotificationRecord] = Seq(
         notificationRecord.copy(numberOfAttempts = 5),
         notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, numberOfAttempts = 5),
+        notificationRecord.copy(reference = "ref3", updatedAt = dateTimeOfNow, numberOfAttempts = 5, status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY),
+        notificationRecord.copy(reference = "ref4", updatedAt = dateTimeOfNow, numberOfAttempts = 5, status = RecordStatusEnum.FAILED_PENDING_RETRY),
         notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2))
       )
       SDESStub.failedStubResponse(INTERNAL_SERVER_ERROR)
@@ -113,8 +119,12 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
           val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get
+          val thirdNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref3").get
+          val fourthNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref4").get
           firstNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
           secondNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
+          thirdNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
+          fourthNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
         }
       }
     }
@@ -132,12 +142,20 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.getPendingNotifications())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
           val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get
+          val thirdNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref3").get
+          val fourthNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref4").get
           firstNotification.nextAttemptAt shouldBe LocalDateTime.of(2020,3,3,3,33)
           secondNotification.nextAttemptAt shouldBe LocalDateTime.of(2020,3,3,3,33)
+          thirdNotification.nextAttemptAt shouldBe LocalDateTime.of(2020,3,3,3,33)
+          fourthNotification.nextAttemptAt shouldBe LocalDateTime.of(2020,3,3,3,33)
           firstNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true
           secondNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true
+          thirdNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true
+          fourthNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true
           firstNotification.numberOfAttempts shouldBe 2
           secondNotification.numberOfAttempts shouldBe 2
+          thirdNotification.numberOfAttempts shouldBe 2
+          fourthNotification.numberOfAttempts shouldBe 2
         }
       }
     }
@@ -155,10 +173,16 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
           val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get
+          val thirdNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref3").get
+          val fourthNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref4").get
           firstNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true
           secondNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true
+          thirdNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true
+          fourthNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true
           firstNotification.numberOfAttempts shouldBe 2
           secondNotification.numberOfAttempts shouldBe 2
+          thirdNotification.numberOfAttempts shouldBe 2
+          fourthNotification.numberOfAttempts shouldBe 2
         }
       }
     }
@@ -168,6 +192,8 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       val pendingNotificationsNearThreshold = Seq(
         notificationRecord.copy(numberOfAttempts = 5),
         notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, numberOfAttempts = 5),
+        notificationRecord.copy(reference = "ref3", updatedAt = dateTimeOfNow, numberOfAttempts = 5, status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY),
+        notificationRecord.copy(reference = "ref4", updatedAt = dateTimeOfNow, numberOfAttempts = 5, status = RecordStatusEnum.FAILED_PENDING_RETRY),
         notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2))
       )
       SDESStub.failedStubResponse(BAD_REQUEST)
@@ -181,8 +207,12 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
           val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get
+          val thirdNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref3").get
+          val fourthNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref4").get
           firstNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
           secondNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
+          thirdNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
+          fourthNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
         }
       }
     }
@@ -199,8 +229,12 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
           val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get
+          val thirdNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref3").get
+          val fourthNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref4").get
           firstNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
           secondNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
+          thirdNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
+          fourthNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
         }
       }
     }
