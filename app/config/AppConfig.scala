@@ -43,7 +43,7 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
   val auditingEnabled: Boolean = config.get[Boolean]("auditing.enabled")
   val graphiteHost: String     = config.get[String]("microservice.metrics.graphite.host")
 
-  lazy val notificationTtl: Long = config.get[Long]("mongo-config.ttlHours")
+  lazy val notificationTtl: Long = config.get[Long]("mongo-config.ttlDays")
 
   def isFeatureSwitchEnabled(featureSwitch: FeatureSwitch): Boolean = config.get[Boolean](featureSwitch.name)
 }
