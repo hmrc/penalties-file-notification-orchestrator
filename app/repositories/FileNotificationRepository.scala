@@ -20,7 +20,7 @@ import com.mongodb.client.model.Updates.{combine, set}
 import config.AppConfig
 import models.SDESNotificationRecord
 import models.notification.RecordStatusEnum
-import org.mongodb.scala.model.Filters.equal
+import org.mongodb.scala.model.Filters.{equal, in}
 import org.mongodb.scala.model.Indexes.ascending
 import org.mongodb.scala.model.{IndexModel, IndexOptions}
 import play.api.libs.json.{Format, Json, OFormat}
@@ -73,7 +73,11 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
   }
 
   def getPendingNotifications(): Future[Seq[SDESNotificationRecord]] = {
-    collection.find(equal("status", RecordStatusEnum.PENDING.toString)).toFuture()
+    collection.find(in("status", Seq(
+      RecordStatusEnum.PENDING.toString,
+      RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY.toString,
+      RecordStatusEnum.FAILED_PENDING_RETRY.toString): _*
+    )).toFuture()
   }
 
   def countRecordsByStatus(status: RecordStatusEnum.Value): Future[Long] = {

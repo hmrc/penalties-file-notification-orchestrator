@@ -39,6 +39,16 @@ class RecordStatusEnumSpec extends SpecBase {
         val result = Json.toJson(RecordStatusEnum.PERMANENT_FAILURE)
         result shouldBe JsString("PERMANENT_FAILURE")
       }
+
+      "status is FAILED_PENDING_RETRY" in {
+        val result = Json.toJson(RecordStatusEnum.FAILED_PENDING_RETRY)
+        result shouldBe JsString("FAILED_PENDING_RETRY")
+      }
+
+      "status is NOT_PROCESSED_PENDING_RETRY" in {
+        val result = Json.toJson(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
+        result shouldBe JsString("NOT_PROCESSED_PENDING_RETRY")
+      }
     }
 
     "be readable from Json" when {
@@ -59,6 +69,18 @@ class RecordStatusEnumSpec extends SpecBase {
         val result = Json.fromJson(JsString("PERMANENT_FAILURE"))(RecordStatusEnum.format)
         result.isSuccess shouldBe true
         result.get shouldBe RecordStatusEnum.PERMANENT_FAILURE
+      }
+
+      "status is FAILED_PENDING_RETRY" in {
+        val result = Json.fromJson(JsString("FAILED_PENDING_RETRY"))(RecordStatusEnum.format)
+        result.isSuccess shouldBe true
+        result.get shouldBe RecordStatusEnum.FAILED_PENDING_RETRY
+      }
+
+      "status is NOT_PROCESSED_PENDING_RETRY" in {
+        val result = Json.fromJson(JsString("NOT_PROCESSED_PENDING_RETRY"))(RecordStatusEnum.format)
+        result.isSuccess shouldBe true
+        result.get shouldBe RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY
       }
     }
 
