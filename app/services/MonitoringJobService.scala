@@ -51,16 +51,20 @@ class MonitoringJobService @Inject()(
       for {
         countOfPendingNotifications <- repository.countRecordsByStatus(RecordStatusEnum.PENDING)
         countOfSentNotifications <- repository.countRecordsByStatus(RecordStatusEnum.SENT)
+        countOfFilesReceivedNotifications <- repository.countRecordsByStatus(RecordStatusEnum.FILE_RECEIVED_IN_SDES)
+        countOfFilesProcessedNotifications <- repository.countRecordsByStatus(RecordStatusEnum.FILE_PROCESSED_IN_SDES)
         countOfFailureNotifications <- repository.countRecordsByStatus(RecordStatusEnum.PERMANENT_FAILURE)
         countOfFailedPendingRetry <- repository.countRecordsByStatus(RecordStatusEnum.FAILED_PENDING_RETRY)
         countOfNotProcessedPendingRetry <- repository.countRecordsByStatus(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
       } yield {
         val logOfPendingNotificationsCount = s"[MonitoringJobService][invoke] - Count of Pending Notifications: $countOfPendingNotifications"
         val logOfSentNotificationsCount = s"[MonitoringJobService][invoke] - Count of Sent Notifications: $countOfSentNotifications"
+        val logOfFileReceivedNotificationsCount = s"[MonitoringJobService][invoke] - Count of File Received in SDES Notifications: $countOfFilesReceivedNotifications"
+        val logOfFileProcessedNotificationsCount = s"[MonitoringJobService][invoke] - Count of File Processed in SDES Notifications: $countOfFilesProcessedNotifications"
         val logOfFailedNotificationsCount = s"[MonitoringJobService][invoke] - Count of Failed Notifications: $countOfFailureNotifications"
         val logOfFailedPendingRetryNotificationsCount = s"[MonitoringJobService][invoke] - Count of Failed Pending Retry Notifications: $countOfFailedPendingRetry"
         val logOfNotProcessedPendingRetryNotificationsCount = s"[MonitoringJobService][invoke] - Count of Not Processed Pending Retry Notifications: $countOfNotProcessedPendingRetry"
-        val seqOfLogs = Seq(logOfPendingNotificationsCount, logOfSentNotificationsCount, logOfFailedNotificationsCount, logOfFailedPendingRetryNotificationsCount, logOfNotProcessedPendingRetryNotificationsCount)
+        val seqOfLogs = Seq(logOfPendingNotificationsCount, logOfSentNotificationsCount, logOfFailedNotificationsCount, logOfFileReceivedNotificationsCount,  logOfFileProcessedNotificationsCount, logOfFailedPendingRetryNotificationsCount, logOfNotProcessedPendingRetryNotificationsCount)
         seqOfLogs.foreach(logger.info(_))
         Right(seqOfLogs)
       }
