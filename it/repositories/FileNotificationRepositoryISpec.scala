@@ -17,13 +17,12 @@
 package repositories
 
 import models.SDESNotificationRecord
-import models.notification.{RecordStatusEnum, _}
+import models.notification._
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.result.DeleteResult
 import org.scalatest.matchers.should.Matchers._
 import play.api.test.Helpers._
 import services.NotificationMongoService
-import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import utils.IntegrationSpecCommonBase
 
 import java.time.LocalDateTime
@@ -165,6 +164,50 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       await(repository.countRecordsByStatus(RecordStatusEnum.PENDING)) shouldBe 1
       await(repository.countRecordsByStatus(RecordStatusEnum.SENT)) shouldBe 1
       await(repository.countRecordsByStatus(RecordStatusEnum.PERMANENT_FAILURE)) shouldBe 1
+    }
+  }
+
+  "updateFileNotification(reference, updatedStatus)" should {
+    "find the existing record and update the fields (not incrementing retries when successful)" in new Setup {
+      val notificationRecordInSent: SDESNotificationRecord = SDESNotificationRecord(
+        reference = "ref",
+        status = RecordStatusEnum.SENT,
+        numberOfAttempts = 1,
+        createdAt = LocalDateTime.of(2020, 1, 1, 1, 1),
+        updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2),
+        nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3),
+        notification = sampleNotification
+      )
+      await(repository.insertFileNotifications(Seq(notificationRecordInSent)))
+      await(repository.updateFileNotification("ref", RecordStatusEnum.FILE_PROCESSED_IN_SDES))
+      val updatedNotification: SDESNotificationRecord = await(repository.collection.find().toFuture).head
+      updatedNotification.reference shouldBe notificationRecordInSent.reference
+      updatedNotification.status shouldBe RecordStatusEnum.FILE_PROCESSED_IN_SDES
+      updatedNotification.numberOfAttempts shouldBe 1
+      updatedNotification.createdAt shouldBe notificationRecordInSent.createdAt
+      updatedNotification.updatedAt.isAfter(notificationRecordInSent.updatedAt) shouldBe true
+      updatedNotification.nextAttemptAt.withSecond(0).withNano(0) shouldBe LocalDateTime.now().withSecond(0).withNano(0)
+    }
+
+    "find the existing record and update the fields (incrementing retries when failed)" in new Setup {
+      val notificationRecordInSent: SDESNotificationRecord = SDESNotificationRecord(
+        reference = "ref",
+        status = RecordStatusEnum.SENT,
+        numberOfAttempts = 1,
+        createdAt = LocalDateTime.of(2020, 1, 1, 1, 1),
+        updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2),
+        nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3),
+        notification = sampleNotification
+      )
+      await(repository.insertFileNotifications(Seq(notificationRecordInSent)))
+      await(repository.updateFileNotification("ref", RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY))
+      val updatedNotification: SDESNotificationRecord = await(repository.collection.find().toFuture).head
+      updatedNotification.reference shouldBe notificationRecordInSent.reference
+      updatedNotification.status shouldBe RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY
+      updatedNotification.numberOfAttempts shouldBe 2
+      updatedNotification.createdAt shouldBe notificationRecordInSent.createdAt
+      updatedNotification.updatedAt.isAfter(notificationRecordInSent.updatedAt) shouldBe true
+      updatedNotification.nextAttemptAt.withSecond(0).withNano(0) shouldBe LocalDateTime.now().plusMinutes(30).withSecond(0).withNano(0)
     }
   }
 }

@@ -21,67 +21,41 @@ import play.api.libs.json.{JsString, Json}
 
 class RecordStatusEnumSpec extends SpecBase {
 
+  def writableTest(expectedResult: String, statusEnum: RecordStatusEnum.Value): Unit = {
+    s"status is ${statusEnum.toString}" in {
+      val result = Json.toJson(statusEnum)
+      result shouldBe JsString(expectedResult)
+    }
+  }
+
+  def readableTest(expectedResult: RecordStatusEnum.Value, statusAsString: String): Unit = {
+    s"status is $statusAsString" in {
+      val result = Json.fromJson(JsString(statusAsString))(RecordStatusEnum.format)
+      result.isSuccess shouldBe true
+      result.get shouldBe expectedResult
+    }
+  }
+
   "RecordStatusEnum" should {
 
     "be writable to Json" when {
-
-      "status is PENDING" in {
-        val result = Json.toJson(RecordStatusEnum.PENDING)
-        result shouldBe JsString("PENDING")
-      }
-
-      "status is SENT" in {
-        val result = Json.toJson(RecordStatusEnum.SENT)
-        result shouldBe JsString("SENT")
-      }
-
-      "status is PERMANENT_FAILURE" in {
-        val result = Json.toJson(RecordStatusEnum.PERMANENT_FAILURE)
-        result shouldBe JsString("PERMANENT_FAILURE")
-      }
-
-      "status is FAILED_PENDING_RETRY" in {
-        val result = Json.toJson(RecordStatusEnum.FAILED_PENDING_RETRY)
-        result shouldBe JsString("FAILED_PENDING_RETRY")
-      }
-
-      "status is NOT_PROCESSED_PENDING_RETRY" in {
-        val result = Json.toJson(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
-        result shouldBe JsString("NOT_PROCESSED_PENDING_RETRY")
-      }
+      writableTest("PENDING", RecordStatusEnum.PENDING)
+      writableTest("SENT", RecordStatusEnum.SENT)
+      writableTest("PERMANENT_FAILURE", RecordStatusEnum.PERMANENT_FAILURE)
+      writableTest("FAILED_PENDING_RETRY", RecordStatusEnum.FAILED_PENDING_RETRY)
+      writableTest("NOT_PROCESSED_PENDING_RETRY", RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
+      writableTest("FILE_RECEIVED_IN_SDES", RecordStatusEnum.FILE_RECEIVED_IN_SDES)
+      writableTest("FILE_PROCESSED_IN_SDES", RecordStatusEnum.FILE_PROCESSED_IN_SDES)
     }
 
     "be readable from Json" when {
-
-      "status is PENDING" in {
-        val result = Json.fromJson(JsString("PENDING"))(RecordStatusEnum.format)
-        result.isSuccess shouldBe true
-        result.get shouldBe RecordStatusEnum.PENDING
-      }
-
-      "status is SENT" in {
-        val result = Json.fromJson(JsString("SENT"))(RecordStatusEnum.format)
-        result.isSuccess shouldBe true
-        result.get shouldBe RecordStatusEnum.SENT
-      }
-
-      "status is PERMANENT_FAILURE" in {
-        val result = Json.fromJson(JsString("PERMANENT_FAILURE"))(RecordStatusEnum.format)
-        result.isSuccess shouldBe true
-        result.get shouldBe RecordStatusEnum.PERMANENT_FAILURE
-      }
-
-      "status is FAILED_PENDING_RETRY" in {
-        val result = Json.fromJson(JsString("FAILED_PENDING_RETRY"))(RecordStatusEnum.format)
-        result.isSuccess shouldBe true
-        result.get shouldBe RecordStatusEnum.FAILED_PENDING_RETRY
-      }
-
-      "status is NOT_PROCESSED_PENDING_RETRY" in {
-        val result = Json.fromJson(JsString("NOT_PROCESSED_PENDING_RETRY"))(RecordStatusEnum.format)
-        result.isSuccess shouldBe true
-        result.get shouldBe RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY
-      }
+      readableTest(RecordStatusEnum.PENDING, "PENDING")
+      readableTest(RecordStatusEnum.SENT, "SENT")
+      readableTest(RecordStatusEnum.PERMANENT_FAILURE, "PERMANENT_FAILURE")
+      readableTest(RecordStatusEnum.FAILED_PENDING_RETRY, "FAILED_PENDING_RETRY")
+      readableTest(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, "NOT_PROCESSED_PENDING_RETRY")
+      readableTest(RecordStatusEnum.FILE_RECEIVED_IN_SDES, "FILE_RECEIVED_IN_SDES")
+      readableTest(RecordStatusEnum.FILE_PROCESSED_IN_SDES, "FILE_PROCESSED_IN_SDES")
     }
 
     "throw an error" when {

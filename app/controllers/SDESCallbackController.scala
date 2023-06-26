@@ -17,19 +17,24 @@
 package controllers
 
 import models.SDESCallback
+import models.SDESFileNotificationEnum._
 import models.monitoring.FileNotificationStatusAuditModel
+import models.notification.RecordStatusEnum._
 import play.api.libs.json.Json
 import play.api.mvc.{Action, AnyContent, ControllerComponents}
+import services.HandleCallbackService
 import services.monitoring.AuditService
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import utils.Logger.logger
-import javax.inject.Inject
 import utils.PagerDutyHelper
 import utils.PagerDutyHelper.PagerDutyKeys._
 
+import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 
-class SDESCallbackController @Inject()(auditService: AuditService, cc: ControllerComponents)(implicit ec: ExecutionContext)
+class SDESCallbackController @Inject()(auditService: AuditService,
+                                       handleCallbackService: HandleCallbackService,
+                                       cc: ControllerComponents)(implicit ec: ExecutionContext)
   extends BackendController(cc) {
 
   def handleCallback: Action[AnyContent] = Action.async {
@@ -52,7 +57,21 @@ class SDESCallbackController @Inject()(auditService: AuditService, cc: Controlle
               logger.debug(s"[SDESCallbackController][handleCallback] Callback received from SDES with status ${sdesCallback.notification}. SDESCallback received = ${sdesCallback.toString}")
               logger.info(s"[SDESCallbackController][handleCallback] Callback received from SDES with status ${sdesCallback.notification}. Correlation ID: ${sdesCallback.correlationID}")
               auditService.audit(FileNotificationStatusAuditModel(sdesCallback.notification, sdesCallback.filename, sdesCallback.correlationID, sdesCallback.failureReason, sdesCallback.availableUntil))
-              Future(NoContent)
+              val notificationStatus = sdesCallback.notification match {
+                case FileReceived => FILE_RECEIVED_IN_SDES
+                case FileProcessed | FileReady => FILE_PROCESSED_IN_SDES
+                case FileProcessingFailure => NOT_PROCESSED_PENDING_RETRY
+              }
+              if(sdesCallback.notification == FileProcessingFailure) {
+                PagerDutyHelper.log("handleCallback", FAILED_TO_PROCESS_FILE_NOTIFICATION)
+              }
+              //Correlation ID maps to reference (at time of writing: 23/06/23)
+              handleCallbackService.updateNotificationAfterCallback(sdesCallback.correlationID, notificationStatus).map {
+                _.fold(
+                  InternalServerError(_),
+                  _ => NoContent
+                )
+              }
             }
           )
         }

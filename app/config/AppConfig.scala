@@ -27,8 +27,6 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
 
   val appName: String = servicesConfig.getString("appName")
 
-  val authBaseUrl: String = servicesConfig.baseUrl("auth")
-
   lazy val useStubForSDESCall: Boolean = config.get[Boolean]("feature-switch.useStubForSDESCall")
 
   lazy val urlHeaderAuthorisation: String = config.get[String]("sdes.outboundBearerToken")
@@ -40,10 +38,9 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
 
   lazy val sdesUrl: String = sdesBaseUrl + s"/notification/fileready"
 
-  val auditingEnabled: Boolean = config.get[Boolean]("auditing.enabled")
-  val graphiteHost: String     = config.get[String]("microservice.metrics.graphite.host")
-
   lazy val notificationTtl: Long = config.get[Long]("mongo-config.ttlDays")
+
+  lazy val minutesUntilNextAttemptOnCallbackFailure: Int = config.get[Int]("notifications.minutesUntilRetryOnCallbackFailure")
 
   def isFeatureSwitchEnabled(featureSwitch: FeatureSwitch): Boolean = config.get[Boolean](featureSwitch.name)
 }
