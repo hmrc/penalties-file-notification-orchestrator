@@ -42,5 +42,7 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
 
   lazy val minutesUntilNextAttemptOnCallbackFailure: Int = config.get[Int]("notifications.minutesUntilRetryOnCallbackFailure")
 
+  lazy val configurableTimeMinutes: Int = config.get[Int]("notifications.configurableTimeMinutes")
+
   def isFeatureSwitchEnabled(featureSwitch: FeatureSwitch): Boolean = config.get[Boolean](featureSwitch.name)
 }
