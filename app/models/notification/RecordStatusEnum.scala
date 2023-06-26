@@ -22,6 +22,8 @@ object RecordStatusEnum extends Enumeration {
   val PENDING: RecordStatusEnum.Value = Value
   val SENT: RecordStatusEnum.Value = Value
   val PERMANENT_FAILURE: RecordStatusEnum.Value = Value
+  val FILE_RECEIVED_IN_SDES: RecordStatusEnum.Value = Value
+  val FILE_PROCESSED_IN_SDES: RecordStatusEnum.Value = Value
   val FAILED_PENDING_RETRY: RecordStatusEnum.Value = Value
   val NOT_PROCESSED_PENDING_RETRY: RecordStatusEnum.Value = Value
 

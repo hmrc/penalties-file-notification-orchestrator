@@ -20,16 +20,18 @@ import com.mongodb.client.model.Updates.{combine, set}
 import config.AppConfig
 import models.SDESNotificationRecord
 import models.notification.RecordStatusEnum
+import models.notification.RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY
 import org.mongodb.scala.model.Filters.{equal, in}
 import org.mongodb.scala.model.Indexes.ascending
+import org.mongodb.scala.model.Updates.inc
 import org.mongodb.scala.model.{IndexModel, IndexOptions}
 import play.api.libs.json.{Format, Json, OFormat}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
 import utils.Logger.logger
-import utils.PagerDutyHelper
 import utils.PagerDutyHelper.PagerDutyKeys._
+import utils.{PagerDutyHelper, TimeMachine}
 
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
@@ -38,6 +40,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
+                                           timeMachine: TimeMachine,
                                            appConfig: AppConfig)(implicit ec: ExecutionContext)
   extends PlayMongoRepository[SDESNotificationRecord](
     collectionName = "sdes-file-notifications",
@@ -47,8 +50,7 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
       IndexModel(ascending("reference"), IndexOptions().unique(true)),
       IndexModel(ascending("status")),
       IndexModel(ascending("createdAt"), IndexOptions().expireAfter(appConfig.notificationTtl, TimeUnit.DAYS))
-    ),
-    replaceIndexes = true) with MongoJavatimeFormats {
+    )) with MongoJavatimeFormats {
 
   implicit val dateFormat: Format[LocalDateTime] = localDateTimeFormat
   implicit val mongoFormats: OFormat[SDESNotificationRecord] = Json.format[SDESNotificationRecord]
@@ -70,6 +72,18 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
       set("status", record.status.toString),
       set("numberOfAttempts", record.numberOfAttempts),
       set("updatedAt", Codecs.toBson(record.updatedAt))
+    )).toFuture()
+  }
+
+  def updateFileNotification(reference: String, updatedStatus: RecordStatusEnum.Value): Future[SDESNotificationRecord] = {
+    logger.info(s"[FileNotificationRepository][updateFileNotification] - Updating record $reference in Mongo")
+    collection.findOneAndUpdate(equal("reference", reference), combine(
+      if(updatedStatus == NOT_PROCESSED_PENDING_RETRY)
+        set("nextAttemptAt", Codecs.toBson(timeMachine.now.plusMinutes(appConfig.minutesUntilNextAttemptOnCallbackFailure)))
+      else set("nextAttemptAt", Codecs.toBson(timeMachine.now)),
+      set("status", updatedStatus.toString),
+      inc("numberOfAttempts", if(updatedStatus == NOT_PROCESSED_PENDING_RETRY) 1 else 0),
+      set("updatedAt", Codecs.toBson(timeMachine.now))
     )).toFuture()
   }
 

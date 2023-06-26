@@ -17,30 +17,37 @@
 package controllers
 
 import base.SpecBase
+import models.SDESFileNotificationEnum._
+import models.notification.RecordStatusEnum._
 import models.{Properties, SDESCallback, SDESFileNotificationEnum}
 import org.mockito.Matchers
-import org.mockito.Mockito.{mock, verify}
-import play.api.http.Status.{BAD_REQUEST, NO_CONTENT}
-import play.api.libs.json.{JsValue, Json}
+import org.mockito.Matchers.any
+import org.mockito.Mockito.{mock, reset, verify, when}
+import org.scalatest.concurrent.Eventually.eventually
+import play.api.http.Status.{BAD_REQUEST, INTERNAL_SERVER_ERROR, NO_CONTENT}
+import play.api.libs.json.{JsObject, JsValue, Json}
 import play.api.mvc.Result
 import play.api.test.Helpers.{contentAsString, defaultAwaitTimeout, status, stubControllerComponents}
+import services.HandleCallbackService
 import services.monitoring.AuditService
-import java.time.LocalDateTime
-import java.time.temporal.ChronoUnit
-
-import org.scalatest.concurrent.Eventually.eventually
 import utils.LogCapturing
 import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys
+import utils.PagerDutyHelper.PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION
 
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class SDESCallbackControllerSpec extends SpecBase with LogCapturing {
   val mockAuditService: AuditService = mock(classOf[AuditService])
+  val mockHandleCallbackService: HandleCallbackService = mock(classOf[HandleCallbackService])
 
-  class Setup() {
-    val sdesCallbackController = new SDESCallbackController(mockAuditService, stubControllerComponents())
+  class Setup {
+    reset(mockAuditService)
+    reset(mockHandleCallbackService)
+    val sdesCallbackController = new SDESCallbackController(mockAuditService, mockHandleCallbackService, stubControllerComponents())
   }
 
   val sdesCallbackModel: SDESCallback = SDESCallback(
@@ -55,38 +62,60 @@ class SDESCallbackControllerSpec extends SpecBase with LogCapturing {
       properties = Some(Seq(Properties("name1", "value1")))
     )
 
-  val sdesCallbackJson: JsValue = Json.parse(
-    s"""
-       |{
-       |  "notification": "FileReady",
-       |  "filename": "axyz.doc",
-       |  "checksumAlgorithm": "SHA-256",
-       |  "checksum": "c6779ec2960296ed9a04f08d67f64422",
-       |  "correlationID":"545d0831-d4ba-408d-b1f1-f4645efb32fd",
-       |  "availableUntil": "2021-01-06T10:01:00.889Z",
-       |  "failureReason": "Virus Detected",
-       |  "dateTime": "2021-01-01T10:01:00.889Z",
-       |  "properties": [
-       |    {
-       |                    "name": "name1",
-       |                    "value": "value1"
-       |    }
-       |  ]
-       |}
-       |""".stripMargin
-  )
+  val sdesCallbackJson: JsObject = Json.obj(
+    "notification" -> "FileReady",
+    "filename" -> "axyz.doc",
+    "checksumAlgorithm" -> "SHA-256",
+    "checksum" -> "c6779ec2960296ed9a04f08d67f64422",
+    "correlationID" -> "545d0831-d4ba-408d-b1f1-f4645efb32fd",
+    "availableUntil" -> "2021-01-06T10:01:00.889Z",
+    "failureReason" -> "Virus Detected",
+    "dateTime" -> "2021-01-01T10:01:00.889Z",
+    "properties" -> Json.arr(
+      Json.obj("name" -> "name1", "value" -> "value1")
+  ))
 
   "receiveSDESCallback" should {
-    "return content string for Valid SDES callback JSON Body" when {
-      "the JSON request body is valid" in new Setup {
-        val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(sdesCallbackJson))
+    s"return NO_CONTENT ($NO_CONTENT)" when {
+      s"the JSON request body is valid - setting to $FILE_RECEIVED_IN_SDES when '$FileReceived' is returned" in new Setup {
+        when(mockHandleCallbackService.updateNotificationAfterCallback(any(), Matchers.eq(FILE_RECEIVED_IN_SDES))).thenReturn(Future.successful(Right()))
+        val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(sdesCallbackJson ++ Json.obj("notification" -> FileReceived)))
         verify(mockAuditService)
           .audit(Matchers.any())(Matchers.any(), Matchers.any(), Matchers.any())
         status(result) shouldBe NO_CONTENT
       }
+
+      s"the JSON request body is valid - setting to $FILE_PROCESSED_IN_SDES when '$FileReady' is returned" in new Setup {
+        when(mockHandleCallbackService.updateNotificationAfterCallback(any(), Matchers.eq(FILE_PROCESSED_IN_SDES))).thenReturn(Future.successful(Right()))
+        val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(sdesCallbackJson ++ Json.obj("notification" -> FileReady)))
+        verify(mockAuditService)
+          .audit(Matchers.any())(Matchers.any(), Matchers.any(), Matchers.any())
+        status(result) shouldBe NO_CONTENT
+      }
+
+      s"the JSON request body is valid - setting to $FILE_PROCESSED_IN_SDES when '$FileProcessed' is returned" in new Setup {
+        when(mockHandleCallbackService.updateNotificationAfterCallback(any(), Matchers.eq(FILE_PROCESSED_IN_SDES))).thenReturn(Future.successful(Right()))
+        val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(sdesCallbackJson ++ Json.obj("notification" -> FileProcessed)))
+        verify(mockAuditService)
+          .audit(Matchers.any())(Matchers.any(), Matchers.any(), Matchers.any())
+        status(result) shouldBe NO_CONTENT
+      }
+
+      s"the JSON request body is valid - setting to $NOT_PROCESSED_PENDING_RETRY when '$FileProcessingFailure' is returned (logging a PD)" in new Setup {
+        when(mockHandleCallbackService.updateNotificationAfterCallback(any(), Matchers.eq(NOT_PROCESSED_PENDING_RETRY))).thenReturn(Future.successful(Right()))
+        withCaptureOfLoggingFrom(logger) {
+          logs => {
+            val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(sdesCallbackJson ++ Json.obj("notification" -> FileProcessingFailure)))
+            verify(mockAuditService)
+              .audit(Matchers.any())(Matchers.any(), Matchers.any(), Matchers.any())
+            status(result) shouldBe NO_CONTENT
+            logs.exists(_.getMessage.contains(FAILED_TO_PROCESS_FILE_NOTIFICATION.toString)) shouldBe true
+          }
+        }
+      }
     }
 
-    "return content string for Invalid SDES callback JSON Body" when {
+    s"return BAD_REQUEST ($BAD_REQUEST)" when {
       "the JSON request body is invalid " in new Setup {
         withCaptureOfLoggingFrom(logger) {
           logs => {
@@ -128,6 +157,14 @@ class SDESCallbackControllerSpec extends SpecBase with LogCapturing {
           }
         }
       }
+    }
+  }
+
+  s"return ISE ($INTERNAL_SERVER_ERROR)" when {
+    "the notification fails to be updated in Mongo" in new Setup {
+      when(mockHandleCallbackService.updateNotificationAfterCallback(any(), any())).thenReturn(Future.successful(Left("Something went wrong")))
+      val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(sdesCallbackJson))
+      status(result) shouldBe INTERNAL_SERVER_ERROR
     }
   }
 }
