@@ -52,11 +52,15 @@ class MonitoringJobService @Inject()(
         countOfPendingNotifications <- repository.countRecordsByStatus(RecordStatusEnum.PENDING)
         countOfSentNotifications <- repository.countRecordsByStatus(RecordStatusEnum.SENT)
         countOfFailureNotifications <- repository.countRecordsByStatus(RecordStatusEnum.PERMANENT_FAILURE)
+        countOfFailedPendingRetry <- repository.countRecordsByStatus(RecordStatusEnum.FAILED_PENDING_RETRY)
+        countOfNotProcessedPendingRetry <- repository.countRecordsByStatus(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
       } yield {
         val logOfPendingNotificationsCount = s"[MonitoringJobService][invoke] - Count of Pending Notifications: $countOfPendingNotifications"
         val logOfSentNotificationsCount = s"[MonitoringJobService][invoke] - Count of Sent Notifications: $countOfSentNotifications"
         val logOfFailedNotificationsCount = s"[MonitoringJobService][invoke] - Count of Failed Notifications: $countOfFailureNotifications"
-        val seqOfLogs = Seq(logOfPendingNotificationsCount, logOfSentNotificationsCount, logOfFailedNotificationsCount)
+        val logOfFailedPendingRetryNotificationsCount = s"[MonitoringJobService][invoke] - Count of Failed Pending Retry Notifications: $countOfFailedPendingRetry"
+        val logOfNotProcessedPendingRetryNotificationsCount = s"[MonitoringJobService][invoke] - Count of Not Processed Pending Retry Notifications: $countOfNotProcessedPendingRetry"
+        val seqOfLogs = Seq(logOfPendingNotificationsCount, logOfSentNotificationsCount, logOfFailedNotificationsCount, logOfFailedPendingRetryNotificationsCount, logOfNotProcessedPendingRetryNotificationsCount)
         seqOfLogs.foreach(logger.info(_))
         Right(seqOfLogs)
       }

@@ -64,6 +64,8 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
       when(mockRepo.countRecordsByStatus(Matchers.eq(RecordStatusEnum.PENDING))).thenReturn(Future.successful(1L))
       when(mockRepo.countRecordsByStatus(Matchers.eq(RecordStatusEnum.SENT))).thenReturn(Future.successful(2L))
       when(mockRepo.countRecordsByStatus(Matchers.eq(RecordStatusEnum.PERMANENT_FAILURE))).thenReturn(Future.successful(3L))
+      when(mockRepo.countRecordsByStatus(Matchers.eq(RecordStatusEnum.FAILED_PENDING_RETRY))).thenReturn(Future.successful(4L))
+      when(mockRepo.countRecordsByStatus(Matchers.eq(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY))).thenReturn(Future.successful(5L))
 
       withCaptureOfLoggingFrom(logger){
         logs => {
@@ -72,11 +74,15 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
           result.right.get shouldBe Seq(
             "[MonitoringJobService][invoke] - Count of Pending Notifications: 1",
             "[MonitoringJobService][invoke] - Count of Sent Notifications: 2",
-            "[MonitoringJobService][invoke] - Count of Failed Notifications: 3"
+            "[MonitoringJobService][invoke] - Count of Failed Notifications: 3",
+            "[MonitoringJobService][invoke] - Count of Failed Pending Retry Notifications: 4",
+            "[MonitoringJobService][invoke] - Count of Not Processed Pending Retry Notifications: 5"
           )
           logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Pending Notifications: 1") shouldBe true
           logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Sent Notifications: 2") shouldBe true
           logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Failed Notifications: 3") shouldBe true
+          logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Failed Pending Retry Notifications: 4") shouldBe true
+          logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Not Processed Pending Retry Notifications: 5") shouldBe true
         }
       }
     }
