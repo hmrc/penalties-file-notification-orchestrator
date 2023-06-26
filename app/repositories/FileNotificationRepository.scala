@@ -47,8 +47,7 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
       IndexModel(ascending("reference"), IndexOptions().unique(true)),
       IndexModel(ascending("status")),
       IndexModel(ascending("createdAt"), IndexOptions().expireAfter(appConfig.notificationTtl, TimeUnit.DAYS))
-    ),
-    replaceIndexes = true) with MongoJavatimeFormats {
+    )) with MongoJavatimeFormats {
 
   implicit val dateFormat: Format[LocalDateTime] = localDateTimeFormat
   implicit val mongoFormats: OFormat[SDESNotificationRecord] = Json.format[SDESNotificationRecord]
