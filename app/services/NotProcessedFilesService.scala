@@ -23,6 +23,7 @@ import models.MongoLockResponses
 import models.notification.RecordStatusEnum
 import play.api.Configuration
 import repositories.FileNotificationRepository
+import scheduler.ScheduleStatus.JobFailed
 import scheduler.{ScheduleStatus, ScheduledService}
 import uk.gov.hmrc.mongo.lock.{LockRepository, LockService, MongoLockRepository}
 import utils.Logger.logger
@@ -49,31 +50,25 @@ class NotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockReposi
   }
 
   //scalastyle:off
-  override def invoke: Future[Either[ScheduleStatus.JobFailed, Seq[String]]] = {
+  override def invoke: Future[Either[JobFailed, String]] = {
     tryLock {
       logger.info(s"[$jobName][invoke] - Job started")
       for {
         asdf <- fileNotificationRepository.getFilesReceivedBySDES()
-      } yield {
-        val files = asdf.filter(notification => {
-          notification.nextAttemptAt.isBefore(timeMachine.now.plusMinutes(appConfig.configurableTimeMinutes))
+        files = asdf.filter(notification => {
+          notification.nextAttemptAt.plusMinutes(appConfig.configurableTimeMinutes).isBefore(timeMachine.now)
         })
+      } yield {
         files.map {
           wrapper => {
-            fileNotificationRepository.updateFileNotification(wrapper.reference, RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
-          }.recoverWith {
+            fileNotificationRepository.updateFileNotification(wrapper.reference, RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY).map(_ => true)
+          }.recover {
             case e => {
               PagerDutyHelper.log("invoke", UNKNOWN_EXCEPTION_FROM_SDES)
               logger.error(s"$e")
-              fileNotificationRepository.updateFileNotification(wrapper).map(_ => false)
+              false
             }
           }
-        }
-      }.map {
-        if(_) {
-          Right("asdf")
-        } else {
-          Left(FailedToProcessNotifications)
         }
       }
     }
