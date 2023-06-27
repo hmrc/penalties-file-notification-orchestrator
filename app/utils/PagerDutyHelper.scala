@@ -31,6 +31,7 @@ object PagerDutyHelper {
     final val FAILED_TO_PARSE_REQUEST_TO_MODEL = Value
     final val FAILED_TO_INSERT_FILE_NOTIFICATION = Value
     final val NOTIFICATION_SET_TO_PERMANENT_FAILURE = Value
+    final val NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY = Value
   }
 
   def log(methodName: String, pagerDutyKey: PagerDutyKeys.Value): Unit = {

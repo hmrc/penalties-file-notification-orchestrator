@@ -18,7 +18,7 @@ package services
 
 import config.AppConfig
 import javax.inject.Inject
-import models.FailedJobResponses.{FailedToProcessNotifications, UnknownProcessingException}
+import models.FailedJobResponses.FailedToProcessNotifications
 import models.MongoLockResponses
 import models.notification.RecordStatusEnum
 import play.api.Configuration
@@ -27,7 +27,7 @@ import scheduler.ScheduleStatus.JobFailed
 import scheduler.{ScheduleStatus, ScheduledService}
 import uk.gov.hmrc.mongo.lock.{LockRepository, LockService, MongoLockRepository}
 import utils.Logger.logger
-import utils.PagerDutyHelper.PagerDutyKeys.{MONGO_LOCK_UNKNOWN_EXCEPTION, UNKNOWN_EXCEPTION_FROM_SDES}
+import utils.PagerDutyHelper.PagerDutyKeys.{MONGO_LOCK_UNKNOWN_EXCEPTION, NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY, UNKNOWN_EXCEPTION_FROM_SDES}
 import utils.{PagerDutyHelper, TimeMachine}
 
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -54,21 +54,31 @@ class NotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockReposi
     tryLock {
       logger.info(s"[$jobName][invoke] - Job started")
       for {
-        asdf <- fileNotificationRepository.getFilesReceivedBySDES()
-        files = asdf.filter(notification => {
+        filesReceived <- fileNotificationRepository.getFilesReceivedBySDES()
+        filteredFiles = filesReceived.filter(notification => {
           notification.nextAttemptAt.plusMinutes(appConfig.configurableTimeMinutes).isBefore(timeMachine.now)
         })
-      } yield {
-        files.map {
+        sequenceOfResults <- Future.sequence(filteredFiles.map {
           wrapper => {
+            PagerDutyHelper.log("invoke", NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY)
+            logger.info(s"[NotProcessedFilesService][invoke] - ")
             fileNotificationRepository.updateFileNotification(wrapper.reference, RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY).map(_ => true)
           }.recover {
             case e => {
               PagerDutyHelper.log("invoke", UNKNOWN_EXCEPTION_FROM_SDES)
-              logger.error(s"$e")
+              logger.error(s"[NotProcessedFilesService][invoke] - Exception occurred processing notifications - message: $e")
               false
             }
           }
+        })
+        isSuccess = sequenceOfResults.forall(identity)
+      } yield {
+        if(isSuccess) {
+          logger.info(s"[NotProcessedFilesService][invoke] - Proccessed all notifications in batch")
+          Right("Processed all notifications")
+        } else {
+          logger.info(s"[NotProcessedFilesService][invoke] - Failed to process all notifications (see previous logs)")
+          Left(FailedToProcessNotifications)
         }
       }
     }
