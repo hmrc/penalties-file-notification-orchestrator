@@ -105,11 +105,9 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
     "process the notifications and return Right if they all succeed - only process if nextAttemptAt is < now" in new Setup {
       when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotifications))
       when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(pendingNotifications))
-      when(mockFileNotificationRepository.updateFileNotification(Matchers.any())).thenReturn(Future.successful(
+      when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any())).thenReturn(Future.successful(
         notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())
       ))
-      when(mockSDESConnector.sendNotificationToSDES(Matchers.any())(Matchers.any()))
-        .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
       val result = await(service.invoke)
       result.isRight shouldBe true
       result.getOrElse("fail") shouldBe "Processed all notifications"
