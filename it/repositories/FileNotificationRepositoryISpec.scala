@@ -189,7 +189,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       updatedNotification.nextAttemptAt.withSecond(0).withNano(0) shouldBe LocalDateTime.now().withSecond(0).withNano(0)
     }
 
-    "find the existing record and update the fields (incrementing retries when failed)" in new Setup {
+    "find the existing record and update the fields (incrementing retries when failed - NOT_PROCESSED_PENDING_RETRY)" in new Setup {
       val notificationRecordInSent: SDESNotificationRecord = SDESNotificationRecord(
         reference = "ref",
         status = RecordStatusEnum.SENT,
@@ -204,6 +204,27 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       val updatedNotification: SDESNotificationRecord = await(repository.collection.find().toFuture).head
       updatedNotification.reference shouldBe notificationRecordInSent.reference
       updatedNotification.status shouldBe RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY
+      updatedNotification.numberOfAttempts shouldBe 2
+      updatedNotification.createdAt shouldBe notificationRecordInSent.createdAt
+      updatedNotification.updatedAt.isAfter(notificationRecordInSent.updatedAt) shouldBe true
+      updatedNotification.nextAttemptAt.withSecond(0).withNano(0) shouldBe LocalDateTime.now().plusMinutes(30).withSecond(0).withNano(0)
+    }
+
+    "find the existing record and update the fields (incrementing retries when failed - FAILED_PENDING_RETRY)" in new Setup {
+      val notificationRecordInSent: SDESNotificationRecord = SDESNotificationRecord(
+        reference = "ref",
+        status = RecordStatusEnum.SENT,
+        numberOfAttempts = 1,
+        createdAt = LocalDateTime.of(2020, 1, 1, 1, 1),
+        updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2),
+        nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3),
+        notification = sampleNotification
+      )
+      await(repository.insertFileNotifications(Seq(notificationRecordInSent)))
+      await(repository.updateFileNotification("ref", RecordStatusEnum.FAILED_PENDING_RETRY))
+      val updatedNotification: SDESNotificationRecord = await(repository.collection.find().toFuture).head
+      updatedNotification.reference shouldBe notificationRecordInSent.reference
+      updatedNotification.status shouldBe RecordStatusEnum.FAILED_PENDING_RETRY
       updatedNotification.numberOfAttempts shouldBe 2
       updatedNotification.createdAt shouldBe notificationRecordInSent.createdAt
       updatedNotification.updatedAt.isAfter(notificationRecordInSent.updatedAt) shouldBe true
