@@ -105,9 +105,12 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
     }
 
     "process the notifications and return Right if they all succeed - only process PENDING notifications where nextAttemptAt <= now" in new Setup {
+      when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotifications))
       when(mockFileNotificationRepository.updateFileNotification(Matchers.any())).thenReturn(Future.successful(
         notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = LocalDateTime.now())
       ))
+      when(mockSDESConnector.sendNotificationToSDES(Matchers.any())(Matchers.any()))
+        .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
       val result = await(service.invoke)
       result.isRight shouldBe true
       result.right.get shouldBe "Processed all notifications"
