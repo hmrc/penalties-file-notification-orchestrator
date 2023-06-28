@@ -101,8 +101,8 @@ class SDESCallbackControllerSpec extends SpecBase with LogCapturing {
         status(result) shouldBe NO_CONTENT
       }
 
-      s"the JSON request body is valid - setting to $NOT_PROCESSED_PENDING_RETRY when '$FileProcessingFailure' is returned (logging a PD)" in new Setup {
-        when(mockHandleCallbackService.updateNotificationAfterCallback(any(), Matchers.eq(NOT_PROCESSED_PENDING_RETRY))).thenReturn(Future.successful(Right()))
+      s"the JSON request body is valid - setting to $FAILED_PENDING_RETRY when '$FileProcessingFailure' is returned (logging a PD)" in new Setup {
+        when(mockHandleCallbackService.updateNotificationAfterCallback(any(), Matchers.eq(FAILED_PENDING_RETRY))).thenReturn(Future.successful(Right()))
         withCaptureOfLoggingFrom(logger) {
           logs => {
             val result: Future[Result] = sdesCallbackController.handleCallback()(fakeRequest.withJsonBody(sdesCallbackJson ++ Json.obj("notification" -> FileProcessingFailure)))

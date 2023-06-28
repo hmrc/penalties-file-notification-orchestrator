@@ -60,9 +60,10 @@ class SDESCallbackController @Inject()(auditService: AuditService,
               val notificationStatus = sdesCallback.notification match {
                 case FileReceived => FILE_RECEIVED_IN_SDES
                 case FileProcessed | FileReady => FILE_PROCESSED_IN_SDES
-                case FileProcessingFailure => NOT_PROCESSED_PENDING_RETRY
+                case FileProcessingFailure => FAILED_PENDING_RETRY
               }
               if(sdesCallback.notification == FileProcessingFailure) {
+                logger.warn(s"SDESCallbackController][handleCallback] - FileProcessingFailure received from SDES (for file reference: ${sdesCallback.correlationID}) with message: ${sdesCallback.failureReason}")
                 PagerDutyHelper.log("handleCallback", FAILED_TO_PROCESS_FILE_NOTIFICATION)
               }
               //Correlation ID maps to reference (at time of writing: 23/06/23)
