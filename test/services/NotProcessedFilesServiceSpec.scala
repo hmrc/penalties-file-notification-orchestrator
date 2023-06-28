@@ -23,11 +23,12 @@ import connectors.SDESConnector
 import models.SDESNotificationRecord
 import models.notification.{RecordStatusEnum, SDESAudit, SDESChecksum, SDESNotification, SDESNotificationFile, SDESProperties}
 import org.mockito.Matchers
-import org.mockito.Mockito.{mock, reset, when}
+import org.mockito.Mockito.{mock, reset, times, verify, when}
 import play.api.Configuration
-import play.api.test.Helpers.{await, defaultAwaitTimeout}
+import play.api.test.Helpers.{NO_CONTENT, await, defaultAwaitTimeout}
 import repositories.FileNotificationRepository
 import scheduler.ScheduleStatus
+import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.{LogCapturing, TimeMachine}
 
@@ -41,7 +42,7 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
   val mockConfig: Configuration = mock(classOf[Configuration])
   val mockTimeMachine: TimeMachine = mock(classOf[TimeMachine])
   val mockFileNotificationRepository: FileNotificationRepository = mock(classOf[FileNotificationRepository])
-  val jobName = "SendFileNotificationsToSDESJob"
+  val jobName = "NotProcessedFilesService"
 
   val mongoLockId: String = s"schedules.$jobName"
   val mongoLockTimeout: Int = 123
@@ -63,7 +64,7 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
 
   val notificationRecord: SDESNotificationRecord = SDESNotificationRecord(
-    reference = "ref",
+    reference = "ref1",
     status = RecordStatusEnum.PENDING,
     numberOfAttempts = 1,
     createdAt = mockDateTime.minusHours(1),
@@ -74,8 +75,8 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
   val pendingNotifications: Seq[SDESNotificationRecord] = Seq(
     notificationRecord,
-    notificationRecord.copy(nextAttemptAt = mockDateTime.minusSeconds(1)),
-    notificationRecord.copy(nextAttemptAt = mockDateTime.plusSeconds(1))
+    notificationRecord.copy(reference= "ref2", nextAttemptAt = mockDateTime.minusSeconds(1)),
+    notificationRecord.copy(reference = "ref3", nextAttemptAt = mockDateTime.plusSeconds(1))
   )
 
   class Setup(withMongoLockStubs: Boolean = true) {
@@ -83,7 +84,7 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
     val service = new NotProcessedFilesService(mockLockRepository, mockFileNotificationRepository, mockTimeMachine, mockConfig, appConfig)
     when(mockConfig.get[Int](Matchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(Matchers.any()))
       .thenReturn(mongoLockTimeout)
-    when(mockTimeMachine.now).thenReturn(mockDateTime)
+    when(mockTimeMachine.now).thenReturn(mockDateTime.plusMinutes(appConfig.configurableTimeMinutes))
     if (withMongoLockStubs) {
       when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
@@ -98,7 +99,21 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
       when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(Seq.empty))
       val result: Either[ScheduleStatus.JobFailed, String] = await(service.invoke)
       result.isRight shouldBe true
-      result.right.get shouldBe "Processed all notifications"
+      result.getOrElse("fail") shouldBe "Processed all notifications"
+    }
+
+    "process the notifications and return Right if they all succeed - only process if nextAttemptAt is < now" in new Setup {
+      when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotifications))
+      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(pendingNotifications))
+      when(mockFileNotificationRepository.updateFileNotification(Matchers.any())).thenReturn(Future.successful(
+        notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())
+      ))
+      when(mockSDESConnector.sendNotificationToSDES(Matchers.any())(Matchers.any()))
+        .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
+      val result = await(service.invoke)
+      result.isRight shouldBe true
+      result.getOrElse("fail") shouldBe "Processed all notifications"
+      mockFileNotificationRepository.countRecordsByStatus(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY) shouldBe 1
     }
   }
 }

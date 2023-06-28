@@ -55,13 +55,18 @@ class NotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockReposi
       logger.info(s"[$jobName][invoke] - Job started")
       for {
         filesReceived <- fileNotificationRepository.getFilesReceivedBySDES()
-        filteredFiles = filesReceived.filter(notification => {
-          notification.nextAttemptAt.plusMinutes(appConfig.configurableTimeMinutes).isBefore(timeMachine.now)
-        })
+        filteredFiles = {
+          logger.info(s"[NotProcessedFilesService][invoke] - Number of files received by SDES: ${filesReceived.size}")
+          filesReceived.filter(notification => {
+            println(Console.BLUE + s"Now is: ${timeMachine.now} Is Notification before it: ${notification.nextAttemptAt.plusMinutes(appConfig.configurableTimeMinutes)}" + Console.RESET)
+            notification.nextAttemptAt.plusMinutes(appConfig.configurableTimeMinutes).isBefore(timeMachine.now)
+          })
+        }
         sequenceOfResults <- Future.sequence(filteredFiles.map {
+          logger.info(s"[NotProcessedFilesService][invoke] - Number of filtered files: ${filteredFiles.size}")
           wrapper => {
             PagerDutyHelper.log("invoke", NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY)
-            logger.info(s"[NotProcessedFilesService][invoke] - ")
+            logger.info(s"[NotProcessedFilesService][invoke] - Updating notification (reference: ${wrapper.reference}) to NOT_PROCESSED_PENDING_RETRY")
             fileNotificationRepository.updateFileNotification(wrapper.reference, RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY).map(_ => true)
           }.recover {
             case e => {
@@ -74,7 +79,7 @@ class NotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockReposi
         isSuccess = sequenceOfResults.forall(identity)
       } yield {
         if(isSuccess) {
-          logger.info(s"[NotProcessedFilesService][invoke] - Proccessed all notifications in batch")
+          logger.info(s"[NotProcessedFilesService][invoke] - Processed all notifications in batch")
           Right("Processed all notifications")
         } else {
           logger.info(s"[NotProcessedFilesService][invoke] - Failed to process all notifications (see previous logs)")
@@ -93,7 +98,7 @@ class NotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockReposi
     }.recover {
       case e: Exception =>
         PagerDutyHelper.log("tryLock", MONGO_LOCK_UNKNOWN_EXCEPTION)
-        logger.info(s"[$jobName] Failed with exception")
+        logger.info(s"[$jobName] Failed with exception: $e")
         Left(MongoLockResponses.UnknownException(e))
     }
   }
