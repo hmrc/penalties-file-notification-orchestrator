@@ -27,7 +27,7 @@ import scheduler.ScheduleStatus.JobFailed
 import scheduler.{ScheduleStatus, ScheduledService}
 import uk.gov.hmrc.mongo.lock.{LockRepository, LockService, MongoLockRepository}
 import utils.Logger.logger
-import utils.PagerDutyHelper.PagerDutyKeys.{MONGO_LOCK_UNKNOWN_EXCEPTION, NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY, UNKNOWN_EXCEPTION_FROM_SDES}
+import utils.PagerDutyHelper.PagerDutyKeys.{FAILED_TO_PROCESS_FILE_NOTIFICATION, MONGO_LOCK_UNKNOWN_EXCEPTION, NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY, UNKNOWN_EXCEPTION_FROM_SDES}
 import utils.{PagerDutyHelper, TimeMachine}
 
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -82,6 +82,7 @@ class NotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockReposi
           logger.info(s"[NotProcessedFilesService][invoke] - Processed all notifications in batch")
           Right("Processed all notifications")
         } else {
+          PagerDutyHelper.log("invoke", FAILED_TO_PROCESS_FILE_NOTIFICATION)
           logger.info(s"[NotProcessedFilesService][invoke] - Failed to process all notifications (see previous logs)")
           Left(FailedToProcessNotifications)
         }
@@ -98,7 +99,7 @@ class NotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockReposi
     }.recover {
       case e: Exception =>
         PagerDutyHelper.log("tryLock", MONGO_LOCK_UNKNOWN_EXCEPTION)
-        logger.info(s"[$jobName] Failed with exception: $e")
+        logger.info(s"[$jobName] Failed with exception")
         Left(MongoLockResponses.UnknownException(e))
     }
   }

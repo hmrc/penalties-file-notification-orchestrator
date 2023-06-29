@@ -121,7 +121,7 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
     }
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and succeeds" in new Setup {
-      val expectingResult = Future.successful(Right(Seq.empty))
+      val expectingResult: Future[Right[Nothing, Seq[Nothing]]] = Future.successful(Right(Seq.empty))
       val exception = new Exception("woopsy")
       when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
