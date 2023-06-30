@@ -19,19 +19,16 @@ package services
 import java.time.LocalDateTime
 
 import base.SpecBase
-import connectors.SDESConnector
-import models.FailedJobResponses.{FailedToProcessNotifications, UnknownProcessingException}
+import models.FailedJobResponses.FailedToProcessNotifications
+import models.notification._
 import models.{MongoLockResponses, SDESNotificationRecord}
-import models.notification.{RecordStatusEnum, SDESAudit, SDESChecksum, SDESNotification, SDESNotificationFile, SDESProperties}
 import org.mockito.Matchers
-import org.mockito.Mockito.{mock, reset, times, verify, when}
+import org.mockito.Mockito._
 import org.scalatest.concurrent.Eventually.eventually
 import play.api.Configuration
-import play.api.http.Status.INTERNAL_SERVER_ERROR
-import play.api.test.Helpers.{NO_CONTENT, await, defaultAwaitTimeout}
+import play.api.test.Helpers.{await, defaultAwaitTimeout}
 import repositories.FileNotificationRepository
 import scheduler.ScheduleStatus
-import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys
@@ -43,7 +40,6 @@ import scala.concurrent.duration.{Duration, DurationInt}
 
 class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
   val mockLockRepository: MongoLockRepository = mock(classOf[MongoLockRepository])
-  val mockSDESConnector: SDESConnector = mock(classOf[SDESConnector])
   val mockConfig: Configuration = mock(classOf[Configuration])
   val mockTimeMachine: TimeMachine = mock(classOf[TimeMachine])
   val mockFileNotificationRepository: FileNotificationRepository = mock(classOf[FileNotificationRepository])
@@ -80,18 +76,12 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
   val pendingNotifications: Seq[SDESNotificationRecord] = Seq(
     notificationRecord,
-    notificationRecord.copy(reference= "ref2", nextAttemptAt = mockDateTime.minusSeconds(1), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
-    notificationRecord.copy(reference = "ref3", nextAttemptAt = mockDateTime.plusHours(1), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES)
-  )
-
-  val pendingNotificationTwo = Seq(
-    notificationRecord,
-    notificationRecord.copy(reference= "ref2", nextAttemptAt = mockDateTime.minusSeconds(1)),
-    notificationRecord.copy(reference= "ref3", nextAttemptAt = mockDateTime.minusSeconds(3))
+    notificationRecord.copy(reference= "ref2", updatedAt = mockDateTime.minusSeconds(1), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
+    notificationRecord.copy(reference = "ref3", updatedAt = mockDateTime.plusHours(1), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES)
   )
 
   class Setup(withMongoLockStubs: Boolean = true) {
-    reset(mockLockRepository, mockConfig, mockSDESConnector, mockFileNotificationRepository, mockTimeMachine, mockSDESConnector)
+    reset(mockLockRepository, mockConfig, mockFileNotificationRepository, mockTimeMachine)
     val service = new NotProcessedFilesService(mockLockRepository, mockFileNotificationRepository, mockTimeMachine, mockConfig, appConfig)
     when(mockConfig.get[Int](Matchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(Matchers.any()))
       .thenReturn(mongoLockTimeout)
@@ -106,15 +96,13 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
   "invoke" should {
     "run the job successfully if there are no relevant notifications" in new Setup {
-      when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(Seq.empty))
       when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(Seq.empty))
       val result: Either[ScheduleStatus.JobFailed, String] = await(service.invoke)
       result.isRight shouldBe true
       result.getOrElse("fail") shouldBe "Processed all notifications"
     }
 
-    "process the notifications and return Right if they all succeed - only process if nextAttemptAt is < now" in new Setup {
-      when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotifications))
+    "process the notifications and return Right if they all succeed - only process if nextAttemptAt + 60 minutes < now" in new Setup {
       when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(pendingNotifications))
       when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any())).thenReturn(Future.successful(
         notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())
@@ -127,19 +115,18 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
     "process the notifications and return Left if some fail" in new Setup {
       val exception = new Exception("woopsy")
-      when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotificationTwo))
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(pendingNotificationTwo))
+      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(pendingNotifications))
       when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any()))
-        .thenReturn(Future.successful(notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())))
         .thenReturn(Future.failed(exception))
+        .thenReturn(Future.successful(notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())))
       val result = await(service.invoke)
       result.isLeft shouldBe true
       result.left.getOrElse("fail") shouldBe FailedToProcessNotifications
       withCaptureOfLoggingFrom(logger) {
         logs => {
           eventually {
-            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_EXCEPTION_FROM_SDES))
-            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION))
+            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION)) shouldBe true
+            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION)) shouldBe true
           }
         }
       }
@@ -147,10 +134,8 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
     "process the notifications and return Left if all fail" in new Setup {
       val exception = new Exception("woopsy")
-      when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotificationTwo))
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(pendingNotificationTwo))
+      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(pendingNotifications))
       when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any()))
-        .thenReturn(Future.failed(exception))
         .thenReturn(Future.failed(exception))
       val result = await(service.invoke)
       result.isLeft shouldBe true
@@ -158,8 +143,8 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
       withCaptureOfLoggingFrom(logger) {
         logs => {
           eventually {
-            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_EXCEPTION_FROM_SDES))
-            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION))
+            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION)) shouldBe true
+            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION)) shouldBe true
           }
         }
       }

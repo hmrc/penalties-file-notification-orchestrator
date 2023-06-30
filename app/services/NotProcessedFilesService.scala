@@ -27,7 +27,7 @@ import scheduler.ScheduleStatus.JobFailed
 import scheduler.{ScheduleStatus, ScheduledService}
 import uk.gov.hmrc.mongo.lock.{LockRepository, LockService, MongoLockRepository}
 import utils.Logger.logger
-import utils.PagerDutyHelper.PagerDutyKeys.{FAILED_TO_PROCESS_FILE_NOTIFICATION, MONGO_LOCK_UNKNOWN_EXCEPTION, NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY, UNKNOWN_EXCEPTION_FROM_SDES}
+import utils.PagerDutyHelper.PagerDutyKeys.{FAILED_TO_PROCESS_FILE_NOTIFICATION, MONGO_LOCK_UNKNOWN_EXCEPTION, NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY, UNKNOWN_EXCEPTION_FROM_SDES, UNKNOWN_PROCESSING_EXCEPTION}
 import utils.{PagerDutyHelper, TimeMachine}
 
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -54,23 +54,23 @@ class NotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockReposi
     tryLock {
       logger.info(s"[$jobName][invoke] - Job started")
       for {
-        filesReceived <- fileNotificationRepository.getFilesReceivedBySDES()
+        filesReceivedBySDES <- fileNotificationRepository.getFilesReceivedBySDES()
         filteredFiles = {
-          logger.info(s"[NotProcessedFilesService][invoke] - Number of files received by SDES: ${filesReceived.size}")
-          filesReceived.filter(notification => {
-            notification.nextAttemptAt.plusMinutes(appConfig.configurableTimeMinutes).isBefore(timeMachine.now)
+          logger.info(s"[NotProcessedFilesService][invoke] - Number of records in ${RecordStatusEnum.FILE_RECEIVED_IN_SDES} state: ${filesReceivedBySDES.size}")
+          filesReceivedBySDES.filter(notification => {
+            notification.updatedAt.plusMinutes(appConfig.configurableTimeMinutes).isBefore(timeMachine.now)
           })
         }
         sequenceOfResults <- Future.sequence(filteredFiles.map {
           logger.info(s"[NotProcessedFilesService][invoke] - Number of filtered files: ${filteredFiles.size}")
-          wrapper => {
+          notification => {
             PagerDutyHelper.log("invoke", NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY)
-            logger.info(s"[NotProcessedFilesService][invoke] - Updating notification (reference: ${wrapper.reference}) to NOT_PROCESSED_PENDING_RETRY")
-            fileNotificationRepository.updateFileNotification(wrapper.reference, RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY).map(_ => true)
+            logger.info(s"[NotProcessedFilesService][invoke] - Updating notification (reference: ${notification.reference}) to NOT_PROCESSED_PENDING_RETRY")
+            fileNotificationRepository.updateFileNotification(notification.reference, RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY).map(_ => true)
           }.recover {
             case e => {
-              PagerDutyHelper.log("invoke", UNKNOWN_EXCEPTION_FROM_SDES)
-              logger.error(s"[NotProcessedFilesService][invoke] - Exception occurred processing notifications - message: $e")
+              PagerDutyHelper.log("invoke", UNKNOWN_PROCESSING_EXCEPTION)
+              logger.error(s"[NotProcessedFilesService][invoke] - Exception occurred processing notification, reference: ${notification.reference} - message: $e")
               false
             }
           }
