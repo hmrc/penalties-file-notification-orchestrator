@@ -96,9 +96,9 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
   }
 
   def getFilesReceivedBySDES(): Future[Seq[SDESNotificationRecord]] = {
-    collection.find(in("status", Seq(
+    collection.find(equal("status",
       RecordStatusEnum.FILE_RECEIVED_IN_SDES.toString
-    ))).toFuture()
+    )).toFuture()
   }
 
   def countRecordsByStatus(status: RecordStatusEnum.Value): Future[Long] = {

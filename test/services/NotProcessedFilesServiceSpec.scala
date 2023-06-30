@@ -80,8 +80,8 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
   val pendingNotifications: Seq[SDESNotificationRecord] = Seq(
     notificationRecord,
-    notificationRecord.copy(reference= "ref2", nextAttemptAt = mockDateTime.minusSeconds(1)),
-    notificationRecord.copy(reference = "ref3", nextAttemptAt = mockDateTime.plusSeconds(1))
+    notificationRecord.copy(reference= "ref2", nextAttemptAt = mockDateTime.minusSeconds(1), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
+    notificationRecord.copy(reference = "ref3", nextAttemptAt = mockDateTime.plusHours(1), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES)
   )
 
   val pendingNotificationTwo = Seq(
@@ -122,6 +122,7 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
       val result = await(service.invoke)
       result.isRight shouldBe true
       result.getOrElse("fail") shouldBe "Processed all notifications"
+      verify(mockFileNotificationRepository, times(1)).updateFileNotification(Matchers.eq("ref2"), Matchers.eq(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY))
     }
 
     "process the notifications and return Left if some fail" in new Setup {

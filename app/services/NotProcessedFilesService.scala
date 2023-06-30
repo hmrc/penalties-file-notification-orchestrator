@@ -58,7 +58,6 @@ class NotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockReposi
         filteredFiles = {
           logger.info(s"[NotProcessedFilesService][invoke] - Number of files received by SDES: ${filesReceived.size}")
           filesReceived.filter(notification => {
-            println(Console.BLUE + s"Now is: ${timeMachine.now} Is Notification before it: ${notification.nextAttemptAt.plusMinutes(appConfig.configurableTimeMinutes)}" + Console.RESET)
             notification.nextAttemptAt.plusMinutes(appConfig.configurableTimeMinutes).isBefore(timeMachine.now)
           })
         }

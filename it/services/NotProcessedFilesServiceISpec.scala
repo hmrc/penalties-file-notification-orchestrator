@@ -26,6 +26,7 @@ import org.mongodb.scala.Document
 import org.scalatest.matchers.should.Matchers._
 import play.api.test.Helpers._
 import repositories.FileNotificationRepository
+import scheduler.ScheduleStatus
 import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.{IntegrationSpecCommonBase, LogCapturing}
 
@@ -58,8 +59,8 @@ class NotProcessedFilesServiceISpec extends IntegrationSpecCommonBase with LogCa
   val pendingNotifications: Seq[SDESNotificationRecord] = Seq(
     notificationRecord,
     notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, nextAttemptAt = LocalDateTime.of(2020,3,3,3,3)),
-    notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2)),
-    notificationRecord.copy(reference = "ref3", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3), status = RecordStatusEnum.FAILED_PENDING_RETRY),
+    notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.minusMinutes(2), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
+    notificationRecord.copy(reference = "ref3", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
     notificationRecord.copy(reference = "ref4", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3), status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
   )
 
@@ -86,12 +87,16 @@ class NotProcessedFilesServiceISpec extends IntegrationSpecCommonBase with LogCa
     "process the notifications and return Right is they all succeed - only process notifications where nextAttempt < now" in new Setup {
       SDESStub.successfulStubResponse()
       await(notificationRepo.insertFileNotifications(pendingNotifications))
-      val result = await(service.invoke)
+      val result: Either[ScheduleStatus.JobFailed, String] = await(service.invoke)
       result.isRight shouldBe true
       result.getOrElse("fail") shouldBe "Processed all notifications"
-      val notificationsInRepo = await(notificationRepo.collection.find(Document()).toFuture())
-      notificationsInRepo.exists(_.equals(notificationRecord.copy(reference = "ref2", updatedAt = dateTimeOfNow.plusMinutes(2) ,status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)))
+      val notificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
       notificationsInRepo.find(_.reference == "ref1").get.status shouldBe RecordStatusEnum.PENDING
+      notificationsInRepo.find(_.reference == "ref2").get.status shouldBe RecordStatusEnum.FILE_RECEIVED_IN_SDES
+      notificationsInRepo.find(_.reference == "ref3").get.status shouldBe RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY
+      notificationsInRepo.find(_.reference == "ref3").get.updatedAt.isAfter(LocalDateTime.of(2020,2,2,2,2)) shouldBe true
+      notificationsInRepo.find(_.reference == "ref4").get.status shouldBe RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY
+      notificationsInRepo.find(_.reference == "ref4").get.updatedAt.isBefore(dateTimeOfNow) shouldBe true
     }
   }
 }
