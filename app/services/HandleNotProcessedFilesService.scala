@@ -56,13 +56,13 @@ class HandleNotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLock
       for {
         filesInReceivedBySDESState <- fileNotificationRepository.getFilesReceivedBySDES()
         filteredFiles = {
-          logger.info(s"[NotProcessedFilesService][invoke] - Number of records in ${RecordStatusEnum.FILE_RECEIVED_IN_SDES} state: ${filesInReceivedBySDESState.size}")
+          logger.info(s"[HandleNotProcessedFilesService][invoke] - Number of records in ${RecordStatusEnum.FILE_RECEIVED_IN_SDES} state: ${filesInReceivedBySDESState.size}")
           filesInReceivedBySDESState.filter(notification => {
             notification.updatedAt.plusMinutes(appConfig.numberOfMinutesToWaitUntilNotificationRetried).isBefore(timeMachine.now)
           })
         }
         sequenceOfResults <- Future.sequence(filteredFiles.map {
-          logger.info(s"[NotProcessedFilesService][invoke] - Number of filtered files: ${filteredFiles.size}")
+          logger.info(s"[HandleNotProcessedFilesService][invoke] - Number of filtered files: ${filteredFiles.size}")
           notification => {
             PagerDutyHelper.log("invoke", NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY)
             logger.info(s"[NotProcessedFilesService][invoke] - Updating notification (reference: ${notification.reference}) to NOT_PROCESSED_PENDING_RETRY")
@@ -70,7 +70,7 @@ class HandleNotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLock
           }.recover {
             case e => {
               PagerDutyHelper.log("invoke", UNKNOWN_PROCESSING_EXCEPTION)
-              logger.error(s"[NotProcessedFilesService][invoke] - Exception occurred processing notification, reference: ${notification.reference} - message: $e")
+              logger.error(s"[HandleNotProcessedFilesService][invoke] - Exception occurred processing notification, reference: ${notification.reference} - message: $e")
               false
             }
           }
@@ -78,11 +78,11 @@ class HandleNotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLock
         isSuccess = sequenceOfResults.forall(identity)
       } yield {
         if(isSuccess) {
-          logger.info(s"[NotProcessedFilesService][invoke] - Processed all notifications in batch")
+          logger.info(s"[HandleNotProcessedFilesService][invoke] - Processed all notifications in batch")
           Right("Processed all notifications")
         } else {
           PagerDutyHelper.log("invoke", FAILED_TO_PROCESS_FILE_NOTIFICATION)
-          logger.info(s"[NotProcessedFilesService][invoke] - Failed to process all notifications (see previous logs)")
+          logger.info(s"[HandleNotProcessedFilesService][invoke] - Failed to process all notifications (see previous logs)")
           Left(FailedToProcessNotifications)
         }
       }
