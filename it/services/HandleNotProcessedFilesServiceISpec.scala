@@ -84,7 +84,8 @@ class HandleNotProcessedFilesServiceISpec extends IntegrationSpecCommonBase with
       result.getOrElse("fail") shouldBe "Processed all notifications"
     }
 
-    "process the notifications and return Right is they all succeed - only process notifications where updatedAt < now" in new Setup {
+    "process the notifications and return Right is they all succeed - only process notifications where updatedAt + X minutes < now " +
+      "(where X = minutes defined in config)" in new Setup {
       SDESStub.successfulStubResponse()
       await(notificationRepo.insertFileNotifications(pendingNotifications))
       val result: Either[ScheduleStatus.JobFailed, String] = await(service.invoke)

@@ -73,7 +73,7 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
     notification = notification
   )
 
-  val pendingNotifications: Seq[SDESNotificationRecord] = Seq(
+  val notificationsInDifferentStates: Seq[SDESNotificationRecord] = Seq(
     notificationRecord,
     notificationRecord.copy(reference= "ref2", updatedAt = mockDateTime.minusSeconds(1), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
     notificationRecord.copy(reference = "ref3", updatedAt = mockDateTime.plusHours(1), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES)
@@ -102,7 +102,7 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
     }
 
     "process the notifications and return Right if they all succeed - only process if updatedAt + X minutes < now (X defined from config)" in new Setup {
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(pendingNotifications))
+      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any())).thenReturn(Future.successful(
         notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())
       ))
@@ -114,7 +114,7 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
     "process the notifications and return Left if some fail" in new Setup {
       val exception = new Exception("woopsy")
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(pendingNotifications))
+      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any()))
         .thenReturn(Future.failed(exception))
         .thenReturn(Future.successful(notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())))
@@ -133,7 +133,7 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
     "process the notifications and return Left if all fail" in new Setup {
       val exception = new Exception("woopsy")
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(pendingNotifications))
+      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any()))
         .thenReturn(Future.failed(exception))
       withCaptureOfLoggingFrom(logger) {
