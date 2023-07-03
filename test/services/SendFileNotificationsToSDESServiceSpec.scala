@@ -126,14 +126,14 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
       when(mockSDESConnector.sendNotificationToSDES(Matchers.any())(Matchers.any()))
         .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
         .thenReturn(Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
-      val result = await(service.invoke)
-      result.isLeft shouldBe true
-      result.left.get shouldBe FailedToProcessNotifications
       withCaptureOfLoggingFrom(logger) {
         logs => {
+          val result = await(service.invoke)
+          result.isLeft shouldBe true
+          result.left.get shouldBe FailedToProcessNotifications
           eventually {
-            logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_5XX_FROM_SDES))
-            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION))
+            logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_5XX_FROM_SDES.toString)) shouldBe true
+            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION.toString)) shouldBe true
           }
         }
       }
@@ -150,14 +150,14 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         .thenReturn(Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
       when(mockFileNotificationRepository.updateFileNotification(Matchers.any()))
         .thenReturn(Future.successful(notificationRecord))
-      val result = await(service.invoke)
-      result.isLeft shouldBe true
-      result.left.get shouldBe FailedToProcessNotifications
       withCaptureOfLoggingFrom(logger) {
         logs => {
+          val result = await(service.invoke)
+          result.isLeft shouldBe true
+          result.left.get shouldBe FailedToProcessNotifications
           eventually {
-            logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_5XX_FROM_SDES))
-            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION))
+            logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_5XX_FROM_SDES.toString)) shouldBe true
+            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION.toString)) shouldBe true
           }
         }
       }
@@ -177,14 +177,14 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
           .thenReturn(Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
         when(mockFileNotificationRepository.updateFileNotification(Matchers.eq(notificationRecordAsPermanentFailure)))
           .thenReturn(Future.successful(notificationRecordAsPermanentFailure))
-        val result = await(service.invoke)
-        result.isLeft shouldBe true
-        result.left.get shouldBe FailedToProcessNotifications
         withCaptureOfLoggingFrom(logger) {
           logs => {
+            val result = await(service.invoke)
+            result.isLeft shouldBe true
+            result.left.get shouldBe FailedToProcessNotifications
             eventually {
-              logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_5XX_FROM_SDES))
-              logs.exists(_.getMessage.contains(PagerDutyKeys.NOTIFICATION_SET_TO_PERMANENT_FAILURE))
+              logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_5XX_FROM_SDES.toString)) shouldBe true
+              logs.exists(_.getMessage.contains(PagerDutyKeys.NOTIFICATION_SET_TO_PERMANENT_FAILURE.toString)) shouldBe true
             }
           }
         }
@@ -199,13 +199,13 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
           .thenReturn(Future.successful(HttpResponse(BAD_REQUEST, "")))
         when(mockFileNotificationRepository.updateFileNotification(Matchers.eq(notificationRecordAsPermanentFailure)))
           .thenReturn(Future.successful(notificationRecordAsPermanentFailure))
-        val result = await(service.invoke)
-        result.isLeft shouldBe true
-        result.left.get shouldBe FailedToProcessNotifications
         withCaptureOfLoggingFrom(logger) {
           logs => {
+            val result = await(service.invoke)
+            result.isLeft shouldBe true
+            result.left.get shouldBe FailedToProcessNotifications
             eventually {
-              logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_4XX_FROM_SDES))
+              logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_4XX_FROM_SDES.toString)) shouldBe true
             }
           }
         }
@@ -220,13 +220,13 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
           .thenReturn(Future.failed(new Exception("i broke")))
         when(mockFileNotificationRepository.updateFileNotification(Matchers.eq(notificationRecordAsPermanentFailure)))
           .thenReturn(Future.successful(notificationRecordAsPermanentFailure))
-        val result = await(service.invoke)
-        result.isLeft shouldBe true
-        result.left.get shouldBe FailedToProcessNotifications
         withCaptureOfLoggingFrom(logger) {
           logs => {
+            val result = await(service.invoke)
+            result.isLeft shouldBe true
+            result.left.get shouldBe FailedToProcessNotifications
             eventually {
-              logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_EXCEPTION_FROM_SDES))
+              logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_EXCEPTION_FROM_SDES.toString)) shouldBe true
             }
           }
         }
@@ -251,13 +251,13 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
 
     s"return $Left $UnknownProcessingException when the repository fails to retrieve notifications" in new Setup {
       when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.failed(new Exception("I broke")))
-      val result = await(service.invoke)
-      result.isLeft shouldBe true
-      result.left.get shouldBe UnknownProcessingException
       withCaptureOfLoggingFrom(logger) {
         logs => {
+          val result = await(service.invoke)
+          result.isLeft shouldBe true
+          result.left.get shouldBe UnknownProcessingException
           eventually {
-            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION))
+            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION.toString)) shouldBe true
           }
         }
       }
@@ -299,7 +299,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
-        capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION))
+        capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION.toString)) shouldBe true
       }
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
@@ -315,7 +315,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
-        capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION))
+        capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION.toString)) shouldBe true
       }
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())

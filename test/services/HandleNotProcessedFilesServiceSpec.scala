@@ -16,8 +16,6 @@
 
 package services
 
-import java.time.LocalDateTime
-
 import base.SpecBase
 import models.FailedJobResponses.FailedToProcessNotifications
 import models.notification._
@@ -34,16 +32,17 @@ import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys
 import utils.{LogCapturing, TimeMachine}
 
+import java.time.LocalDateTime
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, DurationInt}
 
-class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
+class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
   val mockLockRepository: MongoLockRepository = mock(classOf[MongoLockRepository])
   val mockConfig: Configuration = mock(classOf[Configuration])
   val mockTimeMachine: TimeMachine = mock(classOf[TimeMachine])
   val mockFileNotificationRepository: FileNotificationRepository = mock(classOf[FileNotificationRepository])
-  val jobName = "NotProcessedFilesService"
+  val jobName = "HandleNotProcessedFilesFromSDESJob"
 
   val mongoLockId: String = s"schedules.$jobName"
   val mongoLockTimeout: Int = 123
@@ -82,10 +81,10 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
   class Setup(withMongoLockStubs: Boolean = true) {
     reset(mockLockRepository, mockConfig, mockFileNotificationRepository, mockTimeMachine)
-    val service = new NotProcessedFilesService(mockLockRepository, mockFileNotificationRepository, mockTimeMachine, mockConfig, appConfig)
+    val service = new HandleNotProcessedFilesService(mockLockRepository, mockFileNotificationRepository, mockTimeMachine, mockConfig, appConfig)
     when(mockConfig.get[Int](Matchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(Matchers.any()))
       .thenReturn(mongoLockTimeout)
-    when(mockTimeMachine.now).thenReturn(mockDateTime.plusMinutes(appConfig.configurableTimeMinutes))
+    when(mockTimeMachine.now).thenReturn(mockDateTime.plusMinutes(appConfig.numberOfMinutesToWaitUntilNotificationRetried))
     if (withMongoLockStubs) {
       when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
@@ -102,7 +101,7 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
       result.getOrElse("fail") shouldBe "Processed all notifications"
     }
 
-    "process the notifications and return Right if they all succeed - only process if nextAttemptAt + 60 minutes < now" in new Setup {
+    "process the notifications and return Right if they all succeed - only process if updatedAt + X minutes < now (X defined from config)" in new Setup {
       when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(pendingNotifications))
       when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any())).thenReturn(Future.successful(
         notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())
@@ -119,14 +118,14 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
       when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any()))
         .thenReturn(Future.failed(exception))
         .thenReturn(Future.successful(notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())))
-      val result = await(service.invoke)
-      result.isLeft shouldBe true
-      result.left.getOrElse("fail") shouldBe FailedToProcessNotifications
       withCaptureOfLoggingFrom(logger) {
         logs => {
+          val result = await(service.invoke)
+          result.isLeft shouldBe true
+          result.left.getOrElse("fail") shouldBe FailedToProcessNotifications
           eventually {
-            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION)) shouldBe true
-            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION)) shouldBe true
+            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION.toString)) shouldBe true
+            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION.toString)) shouldBe true
           }
         }
       }
@@ -137,14 +136,14 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
       when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(pendingNotifications))
       when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any()))
         .thenReturn(Future.failed(exception))
-      val result = await(service.invoke)
-      result.isLeft shouldBe true
-      result.left.getOrElse("fail") shouldBe FailedToProcessNotifications
       withCaptureOfLoggingFrom(logger) {
         logs => {
+          val result = await(service.invoke)
+          result.isLeft shouldBe true
+          result.left.getOrElse("fail") shouldBe FailedToProcessNotifications
           eventually {
-            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION)) shouldBe true
-            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION)) shouldBe true
+            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION.toString)) shouldBe true
+            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION.toString)) shouldBe true
           }
         }
       }
@@ -187,7 +186,7 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
         eventually {
-          capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION))
+          capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION.toString)) shouldBe true
         }
       }
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
@@ -205,7 +204,7 @@ class NotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
         eventually {
-          capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION))
+          capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION.toString)) shouldBe true
         }
       }
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))

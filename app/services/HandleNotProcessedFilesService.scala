@@ -17,7 +17,6 @@
 package services
 
 import config.AppConfig
-import javax.inject.Inject
 import models.FailedJobResponses.FailedToProcessNotifications
 import models.MongoLockResponses
 import models.notification.RecordStatusEnum
@@ -27,20 +26,21 @@ import scheduler.ScheduleStatus.JobFailed
 import scheduler.{ScheduleStatus, ScheduledService}
 import uk.gov.hmrc.mongo.lock.{LockRepository, LockService, MongoLockRepository}
 import utils.Logger.logger
-import utils.PagerDutyHelper.PagerDutyKeys.{FAILED_TO_PROCESS_FILE_NOTIFICATION, MONGO_LOCK_UNKNOWN_EXCEPTION, NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY, UNKNOWN_EXCEPTION_FROM_SDES, UNKNOWN_PROCESSING_EXCEPTION}
+import utils.PagerDutyHelper.PagerDutyKeys._
 import utils.{PagerDutyHelper, TimeMachine}
 
+import javax.inject.Inject
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
 
-class NotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockRepository,
+class HandleNotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockRepository,
                                          fileNotificationRepository: FileNotificationRepository,
                                          timeMachine: TimeMachine,
                                          config: Configuration,
                                          appConfig: AppConfig
                                         )(implicit ec: ExecutionContext) extends ScheduledService[Either[ScheduleStatus.JobFailed, String]] {
 
-  val jobName = "NotProcessedFilesService"
+  val jobName = "HandleNotProcessedFilesFromSDESJob"
   lazy val mongoLockTimeoutSeconds: Int = config.get[Int](s"schedules.$jobName.mongoLockTimeout")
 
   lazy val lockKeeper: LockService = new LockService {
@@ -54,11 +54,11 @@ class NotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockReposi
     tryLock {
       logger.info(s"[$jobName][invoke] - Job started")
       for {
-        filesReceivedBySDES <- fileNotificationRepository.getFilesReceivedBySDES()
+        filesInReceivedBySDESState <- fileNotificationRepository.getFilesReceivedBySDES()
         filteredFiles = {
-          logger.info(s"[NotProcessedFilesService][invoke] - Number of records in ${RecordStatusEnum.FILE_RECEIVED_IN_SDES} state: ${filesReceivedBySDES.size}")
-          filesReceivedBySDES.filter(notification => {
-            notification.updatedAt.plusMinutes(appConfig.configurableTimeMinutes).isBefore(timeMachine.now)
+          logger.info(s"[NotProcessedFilesService][invoke] - Number of records in ${RecordStatusEnum.FILE_RECEIVED_IN_SDES} state: ${filesInReceivedBySDESState.size}")
+          filesInReceivedBySDESState.filter(notification => {
+            notification.updatedAt.plusMinutes(appConfig.numberOfMinutesToWaitUntilNotificationRetried).isBefore(timeMachine.now)
           })
         }
         sequenceOfResults <- Future.sequence(filteredFiles.map {

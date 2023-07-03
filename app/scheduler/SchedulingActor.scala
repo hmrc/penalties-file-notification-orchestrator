@@ -18,7 +18,7 @@ package scheduler
 
 import akka.actor.{Actor, ActorLogging, Props}
 import scheduler.SchedulingActor._
-import services.{MonitoringJobService, NotProcessedFilesService, SendFileNotificationsToSDESService}
+import services.{MonitoringJobService, HandleNotProcessedFilesService, SendFileNotificationsToSDESService}
 import utils.Logger.logger
 
 class SchedulingActor extends Actor with ActorLogging {
@@ -40,5 +40,5 @@ object SchedulingActor {
   case class MonitoringJobMessage(service: MonitoringJobService) extends ScheduledMessage[Either[ScheduleStatus.JobFailed, Seq[String]]]
   case class SendFileNotificationsToSDESMessage(service: SendFileNotificationsToSDESService)
     extends ScheduledMessage[Either[ScheduleStatus.JobFailed, String]]
-  case class HandleNotProcessedFilesFromSDESMessage(service: NotProcessedFilesService) extends ScheduledMessage[Either[ScheduleStatus.JobFailed, String]]
+  case class HandleNotProcessedFilesFromSDESMessage(service: HandleNotProcessedFilesService) extends ScheduledMessage[Either[ScheduleStatus.JobFailed, String]]
 }

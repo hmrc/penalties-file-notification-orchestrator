@@ -22,15 +22,15 @@ import play.api.Configuration
 import play.api.inject.ApplicationLifecycle
 import scheduler.ScheduledJob
 import scheduler.SchedulingActor.HandleNotProcessedFilesFromSDESMessage
-import services.NotProcessedFilesService
+import services.HandleNotProcessedFilesService
 
 class HandleNotProcessedFilesFromSDESJob @Inject()(val config: Configuration,
-                                                   val notProcessedFilesService: NotProcessedFilesService,
+                                                   val handleNotProcessedFilesService: HandleNotProcessedFilesService,
                                                    val applicationLifecycle: ApplicationLifecycle
                                                   ) extends ScheduledJob {
   val jobName = "HandleNotProcessedFilesFromSDESJob"
   val actorSystem: ActorSystem = ActorSystem(jobName)
-  val scheduledMessage: HandleNotProcessedFilesFromSDESMessage = HandleNotProcessedFilesFromSDESMessage(notProcessedFilesService)
+  val scheduledMessage: HandleNotProcessedFilesFromSDESMessage = HandleNotProcessedFilesFromSDESMessage(handleNotProcessedFilesService)
 
   schedule
 }

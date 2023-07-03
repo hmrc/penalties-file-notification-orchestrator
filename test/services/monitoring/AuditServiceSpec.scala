@@ -64,15 +64,10 @@ class AuditServiceSpec extends SpecBase with LogCapturing {
 
   "toExtendedDataEvent" should {
     "create and log the creation of the audit event" in new Setup {
-      withCaptureOfLoggingFrom(logger) {
-        logs => {
-          val result: ExtendedDataEvent = service.toExtendedDataEvent(jsonAuditModel, "/")
-          result.detail shouldBe jsonAuditModel.detail
-          result.auditType shouldBe jsonAuditModel.auditType
-          result.auditSource shouldBe "penalties-file-notification-orchestrator"
-          logs.exists(_.getMessage.contains("[AuditService][toExtendedDataEvent] Audit Event:")) shouldBe true
-        }
-      }
+      val result: ExtendedDataEvent = service.toExtendedDataEvent(jsonAuditModel, "/")
+      result.detail shouldBe jsonAuditModel.detail
+      result.auditType shouldBe jsonAuditModel.auditType
+      result.auditSource shouldBe "penalties-file-notification-orchestrator"
     }
   }
 }

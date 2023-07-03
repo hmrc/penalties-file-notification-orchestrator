@@ -32,9 +32,9 @@ import utils.{IntegrationSpecCommonBase, LogCapturing}
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class NotProcessedFilesServiceISpec extends IntegrationSpecCommonBase with LogCapturing {
+class HandleNotProcessedFilesServiceISpec extends IntegrationSpecCommonBase with LogCapturing {
   val lockRepository: MongoLockRepository = injector.instanceOf[MongoLockRepository]
-  val service: NotProcessedFilesService = injector.instanceOf[NotProcessedFilesService]
+  val service: HandleNotProcessedFilesService = injector.instanceOf[HandleNotProcessedFilesService]
   val notificationRepo: FileNotificationRepository = injector.instanceOf[FileNotificationRepository]
 
   class Setup {
@@ -59,9 +59,9 @@ class NotProcessedFilesServiceISpec extends IntegrationSpecCommonBase with LogCa
   val pendingNotifications: Seq[SDESNotificationRecord] = Seq(
     notificationRecord,
     notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3)),
-    notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.minusMinutes(2), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
-    notificationRecord.copy(reference = "ref3", nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
-    notificationRecord.copy(reference = "ref4", nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3), status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
+    notificationRecord.copy(reference = "ref2", updatedAt = dateTimeOfNow.minusMinutes(2), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
+    notificationRecord.copy(reference = "ref3", updatedAt = LocalDateTime.of(2020, 3, 3, 3, 3), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
+    notificationRecord.copy(reference = "ref4", updatedAt = LocalDateTime.of(2020, 3, 3, 3, 3), status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
   )
 
   "tryLock" should {
