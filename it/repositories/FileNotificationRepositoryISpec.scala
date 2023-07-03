@@ -231,4 +231,21 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       updatedNotification.nextAttemptAt.withSecond(0).withNano(0) shouldBe LocalDateTime.now().plusMinutes(30).withSecond(0).withNano(0)
     }
   }
+
+  "getFilesReceivedBySDES" should {
+    s"return correct number of ${RecordStatusEnum.FILE_RECEIVED_IN_SDES} when called" in {
+      val notification = SDESNotificationRecord(
+        "ref1", RecordStatusEnum.PENDING, notification = sampleNotification)
+      val notificationsWithFileReceived = Seq(
+        notification, notification.copy(reference = "ref2", status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
+        notification.copy("ref3", status = RecordStatusEnum.FAILED_PENDING_RETRY),
+        notification.copy("ref4", status = RecordStatusEnum.FILE_RECEIVED_IN_SDES))
+
+      await(repository.insertFileNotifications(notificationsWithFileReceived))
+      val result = await(repository.getFilesReceivedBySDES())
+      result.size shouldBe 2
+      result.exists(_.reference.equals("ref2")) shouldBe true
+      result.exists(_.reference.equals("ref4")) shouldBe true
+    }
+  }
 }

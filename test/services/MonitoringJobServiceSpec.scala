@@ -121,17 +121,16 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
     }
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and succeeds" in new Setup {
-      val expectingResult = Future.successful(Right(Seq.empty))
       val exception = new Exception("woopsy")
       when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
       when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.successful(()))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
-        await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
+        await(service.tryLock(Future.successful(Right(Seq.empty)))) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
         eventually {
-          capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION))
+          capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION.toString)) shouldBe true
         }
       }
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
@@ -139,17 +138,16 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
     }
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and failed also" in new Setup {
-      val expectingResult = Future.successful(Right(Seq.empty))
       val exception = new Exception("not again")
       when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
       when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
         .thenReturn(Future.failed(exception))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
-        await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
+        await(service.tryLock(Future.successful(Right(Seq.empty)))) shouldBe Left(MongoLockResponses.UnknownException(exception))
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Failed with exception") shouldBe true
         eventually {
-          capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION))
+          capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION.toString)) shouldBe true
         }
       }
       verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
