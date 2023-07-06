@@ -19,7 +19,6 @@ package controllers
 import models.SDESNotificationRecord
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.result.DeleteResult
-import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.matchers.should.Matchers._
 import play.api.libs.json.{JsValue, Json}
 import play.api.libs.ws.WSResponse
@@ -40,7 +39,7 @@ class OrchestratorControllerISpec extends IntegrationSpecCommonBase with LogCapt
     repository
       .collection
       .deleteMany(filter = Document())
-      .toFuture
+      .toFuture()
 
   class Setup {
     await(deleteAll())
@@ -80,7 +79,7 @@ class OrchestratorControllerISpec extends IntegrationSpecCommonBase with LogCapt
           jsonToReceive
         ))
         result.status shouldBe OK
-        val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().toFuture)
+        val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().toFuture())
         recordsInMongoAfterInsertion.size shouldBe 1
         Json.toJson(Seq(recordsInMongoAfterInsertion.head.notification)) shouldBe jsonToReceive
       }

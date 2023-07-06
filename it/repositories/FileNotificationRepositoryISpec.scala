@@ -37,7 +37,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
     repository
       .collection
       .deleteMany(filter = Document())
-      .toFuture
+      .toFuture()
 
   class Setup {
     await(deleteAll())
@@ -61,7 +61,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
     "insert a single notification received from the backend" in new Setup{
       val result: Boolean = await(repository.insertFileNotifications(Seq(notificationRecord)))
       result shouldBe true
-      val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().toFuture)
+      val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().toFuture())
       recordsInMongoAfterInsertion.size shouldBe 1
       recordsInMongoAfterInsertion.head shouldBe notificationRecord
     }
@@ -69,7 +69,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
     "insert multiple notifications received from the backend" in new Setup {
       val result: Boolean = await(repository.insertFileNotifications(Seq(notificationRecord, notificationRecord2)))
       result shouldBe true
-      val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().toFuture)
+      val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().toFuture())
       recordsInMongoAfterInsertion.size shouldBe 2
       recordsInMongoAfterInsertion.head shouldBe notificationRecord
       recordsInMongoAfterInsertion.last shouldBe notificationRecord2
@@ -180,7 +180,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       )
       await(repository.insertFileNotifications(Seq(notificationRecordInSent)))
       await(repository.updateFileNotification("ref", RecordStatusEnum.FILE_PROCESSED_IN_SDES))
-      val updatedNotification: SDESNotificationRecord = await(repository.collection.find().toFuture).head
+      val updatedNotification: SDESNotificationRecord = await(repository.collection.find().toFuture()).head
       updatedNotification.reference shouldBe notificationRecordInSent.reference
       updatedNotification.status shouldBe RecordStatusEnum.FILE_PROCESSED_IN_SDES
       updatedNotification.numberOfAttempts shouldBe 1
@@ -201,7 +201,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       )
       await(repository.insertFileNotifications(Seq(notificationRecordInSent)))
       await(repository.updateFileNotification("ref", RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY))
-      val updatedNotification: SDESNotificationRecord = await(repository.collection.find().toFuture).head
+      val updatedNotification: SDESNotificationRecord = await(repository.collection.find().toFuture()).head
       updatedNotification.reference shouldBe notificationRecordInSent.reference
       updatedNotification.status shouldBe RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY
       updatedNotification.numberOfAttempts shouldBe 2
@@ -222,7 +222,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       )
       await(repository.insertFileNotifications(Seq(notificationRecordInSent)))
       await(repository.updateFileNotification("ref", RecordStatusEnum.FAILED_PENDING_RETRY))
-      val updatedNotification: SDESNotificationRecord = await(repository.collection.find().toFuture).head
+      val updatedNotification: SDESNotificationRecord = await(repository.collection.find().toFuture()).head
       updatedNotification.reference shouldBe notificationRecordInSent.reference
       updatedNotification.status shouldBe RecordStatusEnum.FAILED_PENDING_RETRY
       updatedNotification.numberOfAttempts shouldBe 2

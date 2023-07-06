@@ -127,6 +127,12 @@ class SendFileNotificationsToSDESService @Inject()(
           fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => false)
         }
       }
+      case status => throw new MatchError(s"Unknown status ($status) returned when sending file (with reference: ${notificationWrapper.reference}) to SDES")
+    }
+  }.recoverWith {
+    case e: Exception => {
+      logger.error(s"[SDESCallbackController][handleCallback] - An exception was thrown while handling the SDES response with error: ${e.getMessage}")
+      Future(false)
     }
   }
 

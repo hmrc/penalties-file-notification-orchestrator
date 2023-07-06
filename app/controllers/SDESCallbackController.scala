@@ -61,6 +61,7 @@ class SDESCallbackController @Inject()(auditService: AuditService,
                 case FileReceived => FILE_RECEIVED_IN_SDES
                 case FileProcessed | FileReady => FILE_PROCESSED_IN_SDES
                 case FileProcessingFailure => FAILED_PENDING_RETRY
+                case _ => throw new MatchError(s"Unmatched file notification status: ${sdesCallback.notification} for notification: ${sdesCallback.correlationID}")
               }
               if(sdesCallback.notification == FileProcessingFailure) {
                 logger.warn(s"SDESCallbackController][handleCallback] - FileProcessingFailure received from SDES (for file reference: ${sdesCallback.correlationID}) with message: ${sdesCallback.failureReason}")
@@ -72,6 +73,11 @@ class SDESCallbackController @Inject()(auditService: AuditService,
                   InternalServerError(_),
                   _ => NoContent
                 )
+              }
+            }.recover {
+              case e: Exception => {
+                logger.error(s"[SDESCallbackController][handleCallback] - An exception was thrown while processing a callback with error: ${e.getMessage} - returning ISE")
+                InternalServerError("Something went wrong")
               }
             }
           )

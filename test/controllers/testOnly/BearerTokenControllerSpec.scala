@@ -17,15 +17,14 @@
 package controllers.testOnly
 
 import base.SpecBase
-import org.mockito.Matchers
-import org.mockito.Matchers.any
-import org.mockito.Mockito.{mock, reset, when}
+import org.mockito.ArgumentMatchers
+import org.mockito.ArgumentMatchers.any
 import play.api.Configuration
 import play.api.http.Status
 import play.api.test.Helpers._
 
 class BearerTokenControllerSpec extends SpecBase {
-  val mockConfig: Configuration = mock(classOf[Configuration])
+  val mockConfig: Configuration = mock[Configuration]
 
   class Setup {
     reset(mockConfig)
@@ -35,7 +34,7 @@ class BearerTokenControllerSpec extends SpecBase {
   "getBearerToken" should {
     s"return OK (${Status.OK}) when the bearer token is in config" in new Setup {
       val serviceName = "fake-service"
-      when(mockConfig.getOptional[String](Matchers.eq(s"$serviceName.outboundBearerToken"))(any()))
+      when(mockConfig.getOptional[String](ArgumentMatchers.eq(s"$serviceName.outboundBearerToken"))(any()))
         .thenReturn(Some("token1234"))
       val result = controller.getBearerToken(serviceName)(fakeRequest)
       status(result) shouldBe OK
@@ -44,7 +43,7 @@ class BearerTokenControllerSpec extends SpecBase {
 
     s"return NOT_FOUND (${Status.NOT_FOUND}) when the config value is not present" in new Setup {
       val serviceName = "fake-service"
-      when(mockConfig.getOptional[String](Matchers.eq(s"$serviceName.outboundBearerToken"))(any()))
+      when(mockConfig.getOptional[String](ArgumentMatchers.eq(s"$serviceName.outboundBearerToken"))(any()))
         .thenReturn(None)
       val result = controller.getBearerToken(serviceName)(fakeRequest)
       status(result) shouldBe NOT_FOUND

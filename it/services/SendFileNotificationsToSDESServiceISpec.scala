@@ -72,7 +72,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       await(lockRepository.takeLock(service.lockKeeper.lockId, randomServerId, releaseDuration))
       await(lockRepository.collection.countDocuments().toFuture()) shouldBe 1
 
-      await(service.invoke).right.get shouldBe s"${service.jobName} - JobAlreadyRunning"
+      await(service.invoke).toOption.get shouldBe s"${service.jobName} - JobAlreadyRunning"
       await(lockRepository.collection.countDocuments().toFuture()) shouldBe 1
     }
   }
@@ -81,7 +81,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
     "run the job successfully if there is no notifications" in new Setup {
       val result = await(service.invoke)
       result.isRight shouldBe true
-      result.right.get shouldBe "Processed all notifications"
+      result.toOption.get shouldBe "Processed all notifications"
     }
 
     "process the notifications and return Right if they all succeed - only process notifications where nextAttemptAt <= now" in new Setup {
@@ -89,7 +89,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       await(notificationRepo.insertFileNotifications(pendingNotifications))
       val result = await(service.invoke)
       result.isRight shouldBe true
-      result.right.get shouldBe "Processed all notifications"
+      result.toOption.get shouldBe "Processed all notifications"
       val notificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
       notificationsInRepo.exists(_.equals(notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2)))) shouldBe true
       notificationsInRepo.find(_.reference == "ref1").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
@@ -114,7 +114,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
         logs => {
           val result = await(service.invoke)
           result.isLeft shouldBe true
-          result.left.get shouldBe FailedToProcessNotifications
+          result.left.toOption.get shouldBe FailedToProcessNotifications
           logs.exists(_.getMessage.equals("[SendFileNotificationsToSDESService][invoke] - Received 500 status code from connector call to SDES with response body: Something broke")) shouldBe true
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
@@ -137,7 +137,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
         logs => {
           val result = await(service.invoke)
           result.isLeft shouldBe true
-          result.left.get shouldBe FailedToProcessNotifications
+          result.left.toOption.get shouldBe FailedToProcessNotifications
           logs.exists(_.getMessage.equals("[SendFileNotificationsToSDESService][invoke] - Received 500 status code from connector call to SDES with response body: Something broke")) shouldBe true
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.getPendingNotifications())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
@@ -168,7 +168,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
         logs => {
           val result = await(service.invoke)
           result.isLeft shouldBe true
-          result.left.get shouldBe FailedToProcessNotifications
+          result.left.toOption.get shouldBe FailedToProcessNotifications
           logs.exists(_.getMessage.contains(s"[SendFileNotificationsToSDESService][invoke] - Received 400 status code from connector call to SDES with response body: Something broke")) shouldBe true
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
@@ -202,7 +202,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
         logs => {
           val result = await(service.invoke)
           result.isLeft shouldBe true
-          result.left.get shouldBe FailedToProcessNotifications
+          result.left.toOption.get shouldBe FailedToProcessNotifications
           logs.exists(_.getMessage.equals("[SendFileNotificationsToSDESService][invoke] - Received 400 status code from connector call to SDES with response body: Something broke")) shouldBe true
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
@@ -224,7 +224,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
         logs => {
           val result = await(service.invoke)
           result.isLeft shouldBe true
-          result.left.get shouldBe FailedToProcessNotifications
+          result.left.toOption.get shouldBe FailedToProcessNotifications
           logs.exists(_.getMessage.contains(s"[SendFileNotificationsToSDESService][invoke] - Exception occurred processing notifications")) shouldBe true
           val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
           val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get

@@ -20,8 +20,7 @@ import base.SpecBase
 import models.FailedJobResponses.FailedToProcessNotifications
 import models.notification._
 import models.{MongoLockResponses, SDESNotificationRecord}
-import org.mockito.Matchers
-import org.mockito.Mockito._
+import org.mockito.ArgumentMatchers
 import org.scalatest.concurrent.Eventually.eventually
 import play.api.Configuration
 import play.api.test.Helpers.{await, defaultAwaitTimeout}
@@ -38,10 +37,10 @@ import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, DurationInt}
 
 class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
-  val mockLockRepository: MongoLockRepository = mock(classOf[MongoLockRepository])
-  val mockConfig: Configuration = mock(classOf[Configuration])
-  val mockTimeMachine: TimeMachine = mock(classOf[TimeMachine])
-  val mockFileNotificationRepository: FileNotificationRepository = mock(classOf[FileNotificationRepository])
+  val mockLockRepository: MongoLockRepository = mock[MongoLockRepository]
+  val mockConfig: Configuration = mock[Configuration]
+  val mockTimeMachine: TimeMachine = mock[TimeMachine]
+  val mockFileNotificationRepository: FileNotificationRepository = mock[FileNotificationRepository]
   val jobName = "HandleNotProcessedFilesFromSDESJob"
 
   val mongoLockId: String = s"schedules.$jobName"
@@ -82,13 +81,13 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
   class Setup(withMongoLockStubs: Boolean = true) {
     reset(mockLockRepository, mockConfig, mockFileNotificationRepository, mockTimeMachine)
     val service = new HandleNotProcessedFilesService(mockLockRepository, mockFileNotificationRepository, mockTimeMachine, mockConfig, appConfig)
-    when(mockConfig.get[Int](Matchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(Matchers.any()))
+    when(mockConfig.get[Int](ArgumentMatchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(ArgumentMatchers.any()))
       .thenReturn(mongoLockTimeout)
     when(mockTimeMachine.now).thenReturn(mockDateTime.plusMinutes(appConfig.numberOfMinutesToWaitUntilNotificationRetried))
     if (withMongoLockStubs) {
-      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
-      when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
+      when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
         .thenReturn(Future.successful(()))
     }
   }
@@ -103,21 +102,20 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
     "process the notifications and return Right if they all succeed - only process if updatedAt + X minutes < now (X defined from config)" in new Setup {
       when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(notificationsInDifferentStates))
-      when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any())).thenReturn(Future.successful(
+      when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any())).thenReturn(Future.successful(
         notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())
       ))
       val result = await(service.invoke)
       result.isRight shouldBe true
       result.getOrElse("fail") shouldBe "Processed all notifications"
-      verify(mockFileNotificationRepository, times(1)).updateFileNotification(Matchers.eq("ref2"), Matchers.eq(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY))
+      verify(mockFileNotificationRepository, times(1)).updateFileNotification(ArgumentMatchers.eq("ref2"), ArgumentMatchers.eq(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY))
     }
 
     "process the notifications and return Left if some fail" in new Setup {
       val exception = new Exception("woopsy")
       when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(notificationsInDifferentStates))
-      when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any()))
-        .thenReturn(Future.failed(exception))
-        .thenReturn(Future.successful(notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())))
+      when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any()))
+        .thenReturn(Future.failed(exception), Future.successful(notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())))
       withCaptureOfLoggingFrom(logger) {
         logs => {
           val result = await(service.invoke)
@@ -134,7 +132,7 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
     "process the notifications and return Left if all fail" in new Setup {
       val exception = new Exception("woopsy")
       when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(notificationsInDifferentStates))
-      when(mockFileNotificationRepository.updateFileNotification(Matchers.any(), Matchers.any()))
+      when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any()))
         .thenReturn(Future.failed(exception))
       withCaptureOfLoggingFrom(logger) {
         logs => {
@@ -153,34 +151,34 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
   "tryLock" should {
     "return a Future successful when lockRepository is able to lock and unlock successfully" in new Setup {
       val expectingResult: Future[Right[Nothing, String]] = Future.successful(Right("hello"))
-      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
-      when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
+      when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
         .thenReturn(Future.successful(()))
       await(service.tryLock(expectingResult)) shouldBe Right("hello")
-      verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
-      verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
+      verify(mockLockRepository, times(1)).takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any())
     }
 
     s"return a $Right ${Seq.empty} is lock returns Future.successful (false)" in new Setup {
       val expectingResult: Future[Right[Nothing, String]] = Future.successful(Right("hello"))
-      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
         .thenReturn(Future.successful(false))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Right(s"$jobName - JobAlreadyRunning")
         capturedLogEvents.exists(_.getMessage == s"[$jobName] Locked because it might be running on another instance") shouldBe true
         capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Locked because it might be running on another instance") shouldBe true
       }
-      verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
-      verify(mockLockRepository, times(0)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
+      verify(mockLockRepository, times(1)).takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration))
+      verify(mockLockRepository, times(0)).releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any())
     }
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and succeeds" in new Setup {
       val expectingResult: Future[Right[Nothing, String]] = Future.successful(Right("hello"))
       val exception = new Exception("woopsy")
-      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
-      when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
+      when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
         .thenReturn(Future.successful(()))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
@@ -189,16 +187,16 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
           capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION.toString)) shouldBe true
         }
       }
-      verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
-      verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
+      verify(mockLockRepository, times(1)).takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any())
     }
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and failed also" in new Setup {
       val expectingResult: Future[Right[Nothing, String]] = Future.successful(Right("hello"))
       val exception = new Exception("not again")
-      when(mockLockRepository.takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration)))
+      when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
-      when(mockLockRepository.releaseLock(Matchers.eq(mongoLockId), Matchers.any()))
+      when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
         .thenReturn(Future.failed(exception))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Left(MongoLockResponses.UnknownException(exception))
@@ -207,8 +205,8 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
           capturedLogEvents.exists(_.getMessage.contains(PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION.toString)) shouldBe true
         }
       }
-      verify(mockLockRepository, times(1)).takeLock(Matchers.eq(mongoLockId), Matchers.any(), Matchers.eq(releaseDuration))
-      verify(mockLockRepository, times(1)).releaseLock(Matchers.eq(mongoLockId), Matchers.any())
+      verify(mockLockRepository, times(1)).takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration))
+      verify(mockLockRepository, times(1)).releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any())
     }
   }
 }
