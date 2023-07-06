@@ -18,20 +18,18 @@ package config.featureSwitches
 
 import base.SpecBase
 import config.AppConfig
-import org.mockito.Matchers.any
-import org.mockito.Mockito.{mock, reset, when}
+import org.mockito.ArgumentMatchers.any
 import org.scalatest.BeforeAndAfterAll
 import play.api.Configuration
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
 class FeatureSwitchingSpec extends SpecBase with BeforeAndAfterAll with FeatureSwitching {
-  val mockConfig: Configuration = mock(classOf[Configuration])
-  val mockServicesConfig: ServicesConfig = mock(classOf[ServicesConfig])
+  val mockConfig: Configuration = mock[Configuration]
+  val mockServicesConfig: ServicesConfig = mock[ServicesConfig]
   val config: AppConfig = new AppConfig(mockConfig, mockServicesConfig)
 
   class Setup {
-    reset(mockConfig)
-    reset(mockServicesConfig)
+    reset(mockConfig, mockServicesConfig)
     val featureSwitching: FeatureSwitching = new FeatureSwitching {
       override implicit val appConfig: AppConfig = config
     }

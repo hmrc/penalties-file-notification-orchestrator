@@ -19,22 +19,20 @@ package services.monitoring
 import base.SpecBase
 import config.AppConfig
 import models.monitoring.JsonAuditModel
-import org.mockito.Matchers
-import org.mockito.Mockito._
+import org.mockito.ArgumentMatchers
 import play.api.libs.json._
 import play.api.test.FakeRequest
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.{AuditConnector, AuditResult}
 import uk.gov.hmrc.play.audit.model.ExtendedDataEvent
 import utils.LogCapturing
-import utils.Logger.logger
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ExecutionContext, Future}
 
 class AuditServiceSpec extends SpecBase with LogCapturing {
-  val mockAuditConnector: AuditConnector = mock(classOf[AuditConnector])
-  val mockConfig: AppConfig = mock(classOf[AppConfig])
+  val mockAuditConnector: AuditConnector = mock[AuditConnector]
+  val mockConfig: AppConfig = mock[AppConfig]
 
   val jsonAuditModel: JsonAuditModel = new JsonAuditModel{
     override val auditType = "testJsonAuditType"
@@ -47,7 +45,7 @@ class AuditServiceSpec extends SpecBase with LogCapturing {
     reset(mockAuditConnector)
     val service = new AuditService(mockConfig, mockAuditConnector)
     when(mockConfig.appName).thenReturn("penalties-file-notification-orchestrator")
-    when(mockAuditConnector.sendExtendedEvent(Matchers.any())(Matchers.any(), Matchers.any())).thenReturn(Future.successful(AuditResult.Success))
+    when(mockAuditConnector.sendExtendedEvent(ArgumentMatchers.any())(ArgumentMatchers.any(), ArgumentMatchers.any())).thenReturn(Future.successful(AuditResult.Success))
   }
 
   "audit" should {
@@ -55,9 +53,9 @@ class AuditServiceSpec extends SpecBase with LogCapturing {
       val expectedData = service.toExtendedDataEvent(jsonAuditModel, "testUrl")
       service.audit(jsonAuditModel)(implicitly, implicitly, FakeRequest("POST", "testUrl"))
       verify(mockAuditConnector)
-        .sendExtendedEvent(Matchers.refEq(expectedData, "eventId", "generatedAt"))(
-          Matchers.any[HeaderCarrier],
-          Matchers.any[ExecutionContext]
+        .sendExtendedEvent(ArgumentMatchers.refEq(expectedData, "eventId", "generatedAt"))(
+          ArgumentMatchers.any[HeaderCarrier],
+          ArgumentMatchers.any[ExecutionContext]
         )
     }
   }
