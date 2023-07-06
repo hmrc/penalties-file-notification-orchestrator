@@ -31,7 +31,7 @@ class HandleCallbackService @Inject()(fileNotificationRepository: FileNotificati
 
   def updateNotificationAfterCallback(reference: String, updatedStatus: RecordStatusEnum.Value): Future[Either[String, Unit]] = {
     fileNotificationRepository.updateFileNotification(reference, updatedStatus).map {
-      _ => Right()
+      _ => Right((): Unit)
     }.recover {
       case e: Exception => {
         logger.error(s"[updateNotificationAfterCallback][updateNotificationAfterCallback] Failed to update record (with reference: $reference with error: ${e.getMessage}")

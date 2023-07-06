@@ -49,7 +49,7 @@ class MonitoringJobServiceISpec extends IntegrationSpecCommonBase with LogCaptur
       await(lockRepository.takeLock(service.lockKeeper.lockId, randomServerId, releaseDuration))
       await(lockRepository.collection.countDocuments().toFuture()) shouldBe 1
 
-      await(service.invoke).right.get shouldBe Seq(s"${service.jobName} - JobAlreadyRunning")
+      await(service.invoke).toOption.get shouldBe Seq(s"${service.jobName} - JobAlreadyRunning")
       await(lockRepository.collection.countDocuments().toFuture()) shouldBe 1
     }
   }
@@ -84,7 +84,7 @@ class MonitoringJobServiceISpec extends IntegrationSpecCommonBase with LogCaptur
         logs => {
           val result = await(service.invoke)
           result.isRight shouldBe true
-          result.right.get shouldBe Seq(
+          result.toOption.get shouldBe Seq(
             "[MonitoringJobService][invoke] - Count of Pending Notifications: 1",
             "[MonitoringJobService][invoke] - Count of Sent Notifications: 1",
             "[MonitoringJobService][invoke] - Count of Failed Notifications: 1",

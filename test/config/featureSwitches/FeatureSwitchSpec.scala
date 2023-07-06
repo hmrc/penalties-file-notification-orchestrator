@@ -18,11 +18,10 @@ package config.featureSwitches
 
 import base.SpecBase
 import config.AppConfig
-import org.mockito.Matchers
-import org.mockito.Mockito.{mock, when}
+import org.mockito.ArgumentMatchers
 
 class FeatureSwitchSpec extends SpecBase {
-  val mockAppConfig: AppConfig = mock(classOf[AppConfig])
+  val mockAppConfig: AppConfig = mock[AppConfig]
 
   class Setup {
     val featureSwitching: FeatureSwitching = new FeatureSwitching {
@@ -58,7 +57,7 @@ class FeatureSwitchSpec extends SpecBase {
         }
 
         s"return true if ${featureSwitch.name} feature switch does not exist in cache but does in config" in new Setup {
-          when(mockAppConfig.isFeatureSwitchEnabled(Matchers.eq(featureSwitch)))
+          when(mockAppConfig.isFeatureSwitchEnabled(ArgumentMatchers.eq(featureSwitch)))
             .thenReturn(true)
           featureSwitching.isEnabled(featureSwitch) shouldBe true
         }

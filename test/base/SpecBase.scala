@@ -17,6 +17,7 @@
 package base
 
 import config.AppConfig
+import org.mockito.MockitoSugar
 import org.scalatest.matchers.should.{Matchers => ShouldMatchers}
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
@@ -24,7 +25,7 @@ import play.api.inject.Injector
 import play.api.mvc.AnyContent
 import play.api.test.FakeRequest
 
-class SpecBase extends AnyWordSpec with ShouldMatchers with GuiceOneAppPerSuite {
+class SpecBase extends AnyWordSpec with ShouldMatchers with GuiceOneAppPerSuite with MockitoSugar {
 
   lazy val injector: Injector = app.injector
 

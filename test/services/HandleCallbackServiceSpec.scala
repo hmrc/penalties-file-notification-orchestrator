@@ -19,8 +19,7 @@ package services
 import base.SpecBase
 import models.SDESNotificationRecord
 import models.notification._
-import org.mockito.Matchers.any
-import org.mockito.Mockito.{mock, reset, when}
+import org.mockito.ArgumentMatchers.any
 import play.api.test.Helpers._
 import repositories.FileNotificationRepository
 import utils.LogCapturing
@@ -31,7 +30,7 @@ import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
 
 class HandleCallbackServiceSpec extends SpecBase with LogCapturing {
-  val mockRepository: FileNotificationRepository = mock(classOf[FileNotificationRepository])
+  val mockRepository: FileNotificationRepository = mock[FileNotificationRepository]
   implicit val ec: ExecutionContext = injector.instanceOf[ExecutionContext]
   val service = new HandleCallbackService(mockRepository)
 

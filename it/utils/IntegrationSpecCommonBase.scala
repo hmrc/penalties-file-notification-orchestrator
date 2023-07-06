@@ -18,7 +18,7 @@ package utils
 
 import com.codahale.metrics.SharedMetricRegistries
 import helpers.WiremockHelper
-import models.notification.{SDESAudit, SDESChecksum, SDESNotification, SDESNotificationFile, SDESProperties}
+import models.notification._
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, TestSuite}
 import org.scalatestplus.play.guice.GuiceOneServerPerSuite

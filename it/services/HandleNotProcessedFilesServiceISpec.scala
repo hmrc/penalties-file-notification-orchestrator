@@ -16,9 +16,6 @@
 
 package services
 
-import java.time.LocalDateTime
-import java.time.temporal.ChronoUnit
-
 import helpers.SDESStub
 import models.SDESNotificationRecord
 import models.notification.RecordStatusEnum
@@ -30,6 +27,8 @@ import scheduler.ScheduleStatus
 import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.{IntegrationSpecCommonBase, LogCapturing}
 
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class HandleNotProcessedFilesServiceISpec extends IntegrationSpecCommonBase with LogCapturing {
