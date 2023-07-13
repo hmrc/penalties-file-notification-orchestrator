@@ -2,14 +2,14 @@ import sbt._
 
 object AppDependencies {
 
-  val bootstrapVersion = "7.13.0"
+  val bootstrapVersion = "7.19.0"
   val hmrcMongoVersion = "0.74.0"
 
   val compile = Seq(
     "uk.gov.hmrc"             %% "bootstrap-backend-play-28"         % bootstrapVersion,
     "uk.gov.hmrc.mongo"       %% "hmrc-mongo-play-28"                % hmrcMongoVersion,
     "com.enragedginger"       %% "akka-quartz-scheduler"             % "1.9.3-akka-2.6.x",
-    "uk.gov.hmrc"             %% "internal-auth-client-play-28"      % "1.4.0"
+    "uk.gov.hmrc"             %% "internal-auth-client-play-28"      % "1.6.0"
   )
 
   val test = Seq(
