@@ -40,5 +40,5 @@ object SchedulingActor {
   case class MonitoringJobMessage(service: MonitoringJobService) extends ScheduledMessage[Either[ScheduleStatus.JobFailed, Seq[String]]]
   case class SendFileNotificationsToSDESMessage(service: SendFileNotificationsToSDESService)
     extends ScheduledMessage[Either[ScheduleStatus.JobFailed, String]]
-  case class HandleNotProcessedFilesFromSDESMessage(service: HandleStuckNotificationsService) extends ScheduledMessage[Either[ScheduleStatus.JobFailed, String]]
+  case class HandleStuckNotificationsMessage(service: HandleStuckNotificationsService) extends ScheduledMessage[Either[ScheduleStatus.JobFailed, String]]
 }

@@ -96,15 +96,9 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
     )).toFuture()
   }
 
-  def getNotificationsSentSDES(): Future[Seq[SDESNotificationRecord]] = {
+  def getNotificationsInState(state: RecordStatusEnum.Value): Future[Seq[SDESNotificationRecord]] = {
     collection.find(equal("status",
-      RecordStatusEnum.SENT.toString
-    )).toFuture()
-  }
-
-  def getFilesReceivedBySDES(): Future[Seq[SDESNotificationRecord]] = {
-    collection.find(equal("status",
-      RecordStatusEnum.FILE_RECEIVED_IN_SDES.toString
+      state.toString
     )).toFuture()
   }
 

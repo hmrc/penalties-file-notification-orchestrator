@@ -94,16 +94,16 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
 
   "invoke" should {
     "run the job successfully if there are no relevant notifications" in new Setup {
-      when(mockFileNotificationRepository.getNotificationsSentSDES()).thenReturn(Future.successful(Seq.empty))
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(Seq.empty))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(Seq.empty))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(Seq.empty))
       val result: Either[ScheduleStatus.JobFailed, String] = await(service.invoke)
       result.isRight shouldBe true
       result.getOrElse("fail") shouldBe "Processed all notifications"
     }
 
     "process the notifications and return Right if they all succeed - only process if updatedAt + X minutes < now (X defined from config)" in new Setup {
-      when(mockFileNotificationRepository.getNotificationsSentSDES()).thenReturn(Future.successful(notificationsInDifferentStates))
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any())).thenReturn(Future.successful(
         notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())
       ))
@@ -115,8 +115,8 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
 
     "process the notifications and return Left if some fail" in new Setup {
       val exception = new Exception("woopsy")
-      when(mockFileNotificationRepository.getNotificationsSentSDES()).thenReturn(Future.successful(notificationsInDifferentStates))
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any()))
         .thenReturn(Future.failed(exception), Future.successful(notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())))
       withCaptureOfLoggingFrom(logger) {
@@ -134,8 +134,8 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
 
     "process the notifications and return Left if all fail" in new Setup {
       val exception = new Exception("woopsy")
-      when(mockFileNotificationRepository.getNotificationsSentSDES()).thenReturn(Future.successful(notificationsInDifferentStates))
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any()))
         .thenReturn(Future.failed(exception))
       withCaptureOfLoggingFrom(logger) {

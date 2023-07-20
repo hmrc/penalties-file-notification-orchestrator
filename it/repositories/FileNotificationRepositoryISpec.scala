@@ -234,8 +234,8 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
     }
   }
 
-  "getNotificationsSentSDES" should {
-    s"return correct number of ${RecordStatusEnum.SENT} when called" in new Setup {
+  "getNotificationsInState" should {
+    s"return correct number of records when called" in new Setup {
       val notification = SDESNotificationRecord(
         "ref1", RecordStatusEnum.PENDING, notification = sampleNotification)
       val notificationsWithFileReceived = Seq(
@@ -245,24 +245,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
 
 
       await(repository.insertFileNotifications(notificationsWithFileReceived))
-      val result = await(repository.getNotificationsSentSDES())
-      result.size shouldBe 2
-      result.exists(_.reference.equals("ref2")) shouldBe true
-      result.exists(_.reference.equals("ref4")) shouldBe true
-    }
-  }
-
-  "getFilesReceivedBySDES" should {
-    s"return correct number of ${RecordStatusEnum.FILE_RECEIVED_IN_SDES} when called" in new Setup {
-      val notification = SDESNotificationRecord(
-        "ref1", RecordStatusEnum.PENDING, notification = sampleNotification)
-      val notificationsWithFileReceived = Seq(
-        notification, notification.copy(reference = "ref2", status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
-        notification.copy("ref3", status = RecordStatusEnum.FAILED_PENDING_RETRY),
-        notification.copy("ref4", status = RecordStatusEnum.FILE_RECEIVED_IN_SDES))
-
-      await(repository.insertFileNotifications(notificationsWithFileReceived))
-      val result = await(repository.getFilesReceivedBySDES())
+      val result = await(repository.getNotificationsInState(RecordStatusEnum.SENT))
       result.size shouldBe 2
       result.exists(_.reference.equals("ref2")) shouldBe true
       result.exists(_.reference.equals("ref4")) shouldBe true

@@ -40,7 +40,6 @@ class HandleStuckNotificationsService @Inject()(lockRepositoryProvider: MongoLoc
                                                 appConfig: AppConfig
                                         )(implicit ec: ExecutionContext) extends ScheduledService[Either[ScheduleStatus.JobFailed, String]] {
 
-//  val jobName = "HandleStuckNotificationsJob"
   val jobName = "HandleStuckNotificationsJob"
   lazy val mongoLockTimeoutSeconds: Int = config.get[Int](s"schedules.$jobName.mongoLockTimeout")
 
@@ -55,8 +54,8 @@ class HandleStuckNotificationsService @Inject()(lockRepositoryProvider: MongoLoc
     tryLock {
       logger.info(s"[$jobName][invoke] - Job started")
       for {
-        notificationsSentToSDES <- fileNotificationRepository.getNotificationsSentSDES()
-        filesInReceivedBySDESState <- fileNotificationRepository.getFilesReceivedBySDES()
+        notificationsSentToSDES <- fileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)
+        filesInReceivedBySDESState <- fileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)
         filteredSentNotifications = {
           logger.info(s"[HandleStuckNotificationsService][invoke] - Number of records in ${RecordStatusEnum.SENT} state: ${notificationsSentToSDES.size}")
           notificationsSentToSDES.filter(notification => {

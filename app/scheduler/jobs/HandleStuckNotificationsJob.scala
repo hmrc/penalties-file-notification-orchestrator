@@ -17,20 +17,21 @@
 package scheduler.jobs
 
 import akka.actor.ActorSystem
+
 import javax.inject.Inject
 import play.api.Configuration
 import play.api.inject.ApplicationLifecycle
 import scheduler.ScheduledJob
-import scheduler.SchedulingActor.HandleNotProcessedFilesFromSDESMessage
+import scheduler.SchedulingActor.HandleStuckNotificationsMessage
 import services.HandleStuckNotificationsService
 
 class HandleStuckNotificationsJob @Inject()(val config: Configuration,
-                                                   val handleNotProcessedFilesService: HandleStuckNotificationsService,
-                                                   val applicationLifecycle: ApplicationLifecycle
+                                            val handleStuckNotificationsService: HandleStuckNotificationsService,
+                                            val applicationLifecycle: ApplicationLifecycle
                                                   ) extends ScheduledJob {
   val jobName = "HandleStuckNotificationsJob"
   val actorSystem: ActorSystem = ActorSystem(jobName)
-  val scheduledMessage: HandleNotProcessedFilesFromSDESMessage = HandleNotProcessedFilesFromSDESMessage(handleNotProcessedFilesService)
+  val scheduledMessage: HandleStuckNotificationsMessage = HandleStuckNotificationsMessage(handleStuckNotificationsService)
 
   schedule
 }
