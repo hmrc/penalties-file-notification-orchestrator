@@ -31,9 +31,9 @@ import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class HandleNotProcessedFilesServiceISpec extends IntegrationSpecCommonBase with LogCapturing {
+class HandleStuckNotificationsServiceISpec extends IntegrationSpecCommonBase with LogCapturing {
   val lockRepository: MongoLockRepository = injector.instanceOf[MongoLockRepository]
-  val service: HandleNotProcessedFilesService = injector.instanceOf[HandleNotProcessedFilesService]
+  val service: HandleStuckNotificationsService = injector.instanceOf[HandleStuckNotificationsService]
   val notificationRepo: FileNotificationRepository = injector.instanceOf[FileNotificationRepository]
 
   class Setup {

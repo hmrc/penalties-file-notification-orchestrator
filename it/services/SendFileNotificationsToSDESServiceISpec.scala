@@ -61,7 +61,8 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
     notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, nextAttemptAt = LocalDateTime.of(2020,3,3,3,3)),
     notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2)),
     notificationRecord.copy(reference = "ref3", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3), status = RecordStatusEnum.FAILED_PENDING_RETRY),
-    notificationRecord.copy(reference = "ref4", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3), status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
+    notificationRecord.copy(reference = "ref4", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3), status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY),
+    notificationRecord.copy(reference = "ref5", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3), status = RecordStatusEnum.FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY)
   )
 
   "tryLock" should {
@@ -96,7 +97,8 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       notificationsInRepo.find(_.reference == "ref").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
       notificationsInRepo.find(_.reference == "ref3").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
       notificationsInRepo.find(_.reference == "ref4").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
-      notificationsInRepo.count(_.status == RecordStatusEnum.SENT) shouldBe 4
+      notificationsInRepo.find(_.reference == "ref5").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
+      notificationsInRepo.count(_.status == RecordStatusEnum.SENT) shouldBe 5
     }
 
     "process the notifications and return Left if there are failures due to 5xx response - setting permanent failure if the retry threshold " +

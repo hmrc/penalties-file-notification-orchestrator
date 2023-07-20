@@ -76,9 +76,12 @@ class MonitoringJobServiceISpec extends IntegrationSpecCommonBase with LogCaptur
 
   val fileProcessedInSDESNotificationRecord: SDESNotificationRecord = pendingNotificationRecord.copy(reference = "ref7", status = RecordStatusEnum.FILE_PROCESSED_IN_SDES)
 
+  val fileNotReceivedInSDESNotificationRecord: SDESNotificationRecord = pendingNotificationRecord.copy(reference = "ref8", status = RecordStatusEnum.FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY)
+
+
   "invoke" should {
     "return the count of all records by Status and log them out" in new Setup {
-      await(repo.insertFileNotifications(Seq(pendingNotificationRecord, sentNotificationRecord, failedNotificationRecord, failedPendingRetryNotificationRecord, notProcessedPendingRetryNotificationRecord, fileReceivedInSDESNotificationRecord, fileProcessedInSDESNotificationRecord)))
+      await(repo.insertFileNotifications(Seq(pendingNotificationRecord, sentNotificationRecord, failedNotificationRecord, failedPendingRetryNotificationRecord, notProcessedPendingRetryNotificationRecord, fileReceivedInSDESNotificationRecord, fileProcessedInSDESNotificationRecord, fileNotReceivedInSDESNotificationRecord)))
 
       withCaptureOfLoggingFrom(logger){
         logs => {
@@ -87,19 +90,21 @@ class MonitoringJobServiceISpec extends IntegrationSpecCommonBase with LogCaptur
           result.toOption.get shouldBe Seq(
             "[MonitoringJobService][invoke] - Count of Pending Notifications: 1",
             "[MonitoringJobService][invoke] - Count of Sent Notifications: 1",
-            "[MonitoringJobService][invoke] - Count of Failed Notifications: 1",
             "[MonitoringJobService][invoke] - Count of File Received in SDES Notifications: 1",
+            "[MonitoringJobService][invoke] - Count of File Not Received in SDES Notifications: 1",
             "[MonitoringJobService][invoke] - Count of File Processed in SDES Notifications: 1",
             "[MonitoringJobService][invoke] - Count of Failed Pending Retry Notifications: 1",
-            "[MonitoringJobService][invoke] - Count of Not Processed Pending Retry Notifications: 1"
+            "[MonitoringJobService][invoke] - Count of Not Processed Pending Retry Notifications: 1",
+            "[MonitoringJobService][invoke] - Count of Failed Notifications: 1"
           )
           logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Pending Notifications: 1") shouldBe true
           logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Sent Notifications: 1") shouldBe true
-          logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Failed Notifications: 1") shouldBe true
           logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of File Received in SDES Notifications: 1") shouldBe true
+          logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of File Not Received in SDES Notifications: 1") shouldBe true
           logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of File Processed in SDES Notifications: 1") shouldBe true
           logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Failed Pending Retry Notifications: 1") shouldBe true
           logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Not Processed Pending Retry Notifications: 1") shouldBe true
+          logs.exists(_.getMessage == "[MonitoringJobService][invoke] - Count of Failed Notifications: 1") shouldBe true
         }
       }
     }

@@ -18,12 +18,12 @@ package global
 
 import play.api.inject.{Binding, Module}
 import play.api.{Configuration, Environment}
-import scheduler.jobs.{HandleNotProcessedFilesFromSDESJob, MonitoringJob, SendFileNotificationsToSDESJob}
+import scheduler.jobs.{HandleStuckNotificationsJob, MonitoringJob, SendFileNotificationsToSDESJob}
 
 class ServiceBindings extends Module {
   override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = Seq(
     bind[SendFileNotificationsToSDESJob].toSelf.eagerly(),
     bind[MonitoringJob].toSelf.eagerly(),
-    bind[HandleNotProcessedFilesFromSDESJob].toSelf.eagerly()
+    bind[HandleStuckNotificationsJob].toSelf.eagerly()
   )
 }
