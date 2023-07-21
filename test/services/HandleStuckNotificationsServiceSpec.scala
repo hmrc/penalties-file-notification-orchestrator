@@ -36,12 +36,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, DurationInt}
 
-class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
+class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
   val mockLockRepository: MongoLockRepository = mock[MongoLockRepository]
   val mockConfig: Configuration = mock[Configuration]
   val mockTimeMachine: TimeMachine = mock[TimeMachine]
   val mockFileNotificationRepository: FileNotificationRepository = mock[FileNotificationRepository]
-  val jobName = "HandleNotProcessedFilesFromSDESJob"
+  val jobName = "HandleStuckNotificationsJob"
 
   val mongoLockId: String = s"schedules.$jobName"
   val mongoLockTimeout: Int = 123
@@ -80,7 +80,7 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
   class Setup(withMongoLockStubs: Boolean = true) {
     reset(mockLockRepository, mockConfig, mockFileNotificationRepository, mockTimeMachine)
-    val service = new HandleNotProcessedFilesService(mockLockRepository, mockFileNotificationRepository, mockTimeMachine, mockConfig, appConfig)
+    val service = new HandleStuckNotificationsService(mockLockRepository, mockFileNotificationRepository, mockTimeMachine, mockConfig, appConfig)
     when(mockConfig.get[Int](ArgumentMatchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(ArgumentMatchers.any()))
       .thenReturn(mongoLockTimeout)
     when(mockTimeMachine.now).thenReturn(mockDateTime.plusMinutes(appConfig.numberOfMinutesToWaitUntilNotificationRetried))
@@ -94,14 +94,16 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
   "invoke" should {
     "run the job successfully if there are no relevant notifications" in new Setup {
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(Seq.empty))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(Seq.empty))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(Seq.empty))
       val result: Either[ScheduleStatus.JobFailed, String] = await(service.invoke)
       result.isRight shouldBe true
       result.getOrElse("fail") shouldBe "Processed all notifications"
     }
 
     "process the notifications and return Right if they all succeed - only process if updatedAt + X minutes < now (X defined from config)" in new Setup {
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any())).thenReturn(Future.successful(
         notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())
       ))
@@ -113,7 +115,8 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
     "process the notifications and return Left if some fail" in new Setup {
       val exception = new Exception("woopsy")
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any()))
         .thenReturn(Future.failed(exception), Future.successful(notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())))
       withCaptureOfLoggingFrom(logger) {
@@ -131,7 +134,8 @@ class HandleNotProcessedFilesServiceSpec extends SpecBase with LogCapturing {
 
     "process the notifications and return Left if all fail" in new Setup {
       val exception = new Exception("woopsy")
-      when(mockFileNotificationRepository.getFilesReceivedBySDES()).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any()))
         .thenReturn(Future.failed(exception))
       withCaptureOfLoggingFrom(logger) {

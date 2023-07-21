@@ -20,7 +20,7 @@ import com.mongodb.client.model.Updates.{combine, set}
 import config.AppConfig
 import models.SDESNotificationRecord
 import models.notification.RecordStatusEnum
-import models.notification.RecordStatusEnum.{FAILED_PENDING_RETRY, NOT_PROCESSED_PENDING_RETRY}
+import models.notification.RecordStatusEnum.{FAILED_PENDING_RETRY, FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY, NOT_PROCESSED_PENDING_RETRY}
 import org.mongodb.scala.model.Filters.{equal, in}
 import org.mongodb.scala.model.Indexes.ascending
 import org.mongodb.scala.model.Updates.inc
@@ -78,11 +78,11 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
   def updateFileNotification(reference: String, updatedStatus: RecordStatusEnum.Value): Future[SDESNotificationRecord] = {
     logger.info(s"[FileNotificationRepository][updateFileNotification] - Updating record $reference in Mongo")
     collection.findOneAndUpdate(equal("reference", reference), combine(
-      if(updatedStatus == NOT_PROCESSED_PENDING_RETRY || updatedStatus == FAILED_PENDING_RETRY)
+      if(updatedStatus == NOT_PROCESSED_PENDING_RETRY || updatedStatus == FAILED_PENDING_RETRY || updatedStatus == FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY)
         set("nextAttemptAt", Codecs.toBson(timeMachine.now.plusMinutes(appConfig.minutesUntilNextAttemptOnCallbackFailure)))
       else set("nextAttemptAt", Codecs.toBson(timeMachine.now)),
       set("status", updatedStatus.toString),
-      inc("numberOfAttempts", if(updatedStatus == NOT_PROCESSED_PENDING_RETRY || updatedStatus == FAILED_PENDING_RETRY) 1 else 0),
+      inc("numberOfAttempts", if(updatedStatus == NOT_PROCESSED_PENDING_RETRY || updatedStatus == FAILED_PENDING_RETRY || updatedStatus == FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY) 1 else 0),
       set("updatedAt", Codecs.toBson(timeMachine.now))
     )).toFuture()
   }
@@ -91,13 +91,14 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
     collection.find(in("status", Seq(
       RecordStatusEnum.PENDING.toString,
       RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY.toString,
-      RecordStatusEnum.FAILED_PENDING_RETRY.toString): _*
+      RecordStatusEnum.FAILED_PENDING_RETRY.toString,
+      RecordStatusEnum.FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY.toString): _*
     )).toFuture()
   }
 
-  def getFilesReceivedBySDES(): Future[Seq[SDESNotificationRecord]] = {
+  def getNotificationsInState(state: RecordStatusEnum.Value): Future[Seq[SDESNotificationRecord]] = {
     collection.find(equal("status",
-      RecordStatusEnum.FILE_RECEIVED_IN_SDES.toString
+      state.toString
     )).toFuture()
   }
 

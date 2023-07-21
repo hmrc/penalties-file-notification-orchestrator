@@ -77,7 +77,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
   }
 
   "getPendingNotifications" should {
-    "get all the notifications in PENDING or FAILED_PENDING_RETRY or NOT_PROCESSED_PENDING_RETRY status" in new Setup {
+    "get all the notifications in PENDING, FAILED_PENDING_RETRY, NOT_PROCESSED_PENDING_RETRY or FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY status" in new Setup {
       val notificationRecordInPending: SDESNotificationRecord = SDESNotificationRecord(
         reference = "ref",
         status = RecordStatusEnum.PENDING,
@@ -91,10 +91,12 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       val notificationRecordPendingRetry: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref4", status = RecordStatusEnum.FAILED_PENDING_RETRY)
       val notificationRecordNotProcessedPendingRetry: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref5", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
       val notificationRecord3: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref3", status = RecordStatusEnum.SENT)
-      await(repository.insertFileNotifications(Seq(notificationRecordInPending, notificationRecord2, notificationRecord3, notificationRecordPendingRetry,
-        notificationRecordNotProcessedPendingRetry)))
+      val notificationRecord6: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref6", status = RecordStatusEnum.FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY)
+
+      await(repository.insertFileNotifications(Seq(notificationRecordInPending, notificationRecord2, notificationRecord3, notificationRecord6,
+        notificationRecordPendingRetry, notificationRecordNotProcessedPendingRetry)))
       val result = await(repository.getPendingNotifications())
-      result shouldBe Seq(notificationRecordPendingRetry, notificationRecordNotProcessedPendingRetry, notificationRecordInPending, notificationRecord2)
+      result shouldBe Seq(notificationRecordPendingRetry, notificationRecord6, notificationRecordNotProcessedPendingRetry, notificationRecordInPending, notificationRecord2)
     }
 
     def onlyStatusTest(status: RecordStatusEnum.Value): Unit = {
@@ -232,17 +234,18 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
     }
   }
 
-  "getFilesReceivedBySDES" should {
-    s"return correct number of ${RecordStatusEnum.FILE_RECEIVED_IN_SDES} when called" in {
+  "getNotificationsInState" should {
+    s"return correct number of records when called" in new Setup {
       val notification = SDESNotificationRecord(
         "ref1", RecordStatusEnum.PENDING, notification = sampleNotification)
       val notificationsWithFileReceived = Seq(
-        notification, notification.copy(reference = "ref2", status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
+        notification, notification.copy(reference = "ref2", status = RecordStatusEnum.SENT),
         notification.copy("ref3", status = RecordStatusEnum.FAILED_PENDING_RETRY),
-        notification.copy("ref4", status = RecordStatusEnum.FILE_RECEIVED_IN_SDES))
+        notification.copy("ref4", status = RecordStatusEnum.SENT))
+
 
       await(repository.insertFileNotifications(notificationsWithFileReceived))
-      val result = await(repository.getFilesReceivedBySDES())
+      val result = await(repository.getNotificationsInState(RecordStatusEnum.SENT))
       result.size shouldBe 2
       result.exists(_.reference.equals("ref2")) shouldBe true
       result.exists(_.reference.equals("ref4")) shouldBe true

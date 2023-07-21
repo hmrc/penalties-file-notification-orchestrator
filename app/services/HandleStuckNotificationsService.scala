@@ -33,14 +33,14 @@ import javax.inject.Inject
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
 
-class HandleNotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLockRepository,
-                                         fileNotificationRepository: FileNotificationRepository,
-                                         timeMachine: TimeMachine,
-                                         config: Configuration,
-                                         appConfig: AppConfig
+class HandleStuckNotificationsService @Inject()(lockRepositoryProvider: MongoLockRepository,
+                                                fileNotificationRepository: FileNotificationRepository,
+                                                timeMachine: TimeMachine,
+                                                config: Configuration,
+                                                appConfig: AppConfig
                                         )(implicit ec: ExecutionContext) extends ScheduledService[Either[ScheduleStatus.JobFailed, String]] {
 
-  val jobName = "HandleNotProcessedFilesFromSDESJob"
+  val jobName = "HandleStuckNotificationsJob"
   lazy val mongoLockTimeoutSeconds: Int = config.get[Int](s"schedules.$jobName.mongoLockTimeout")
 
   lazy val lockKeeper: LockService = new LockService {
@@ -54,23 +54,43 @@ class HandleNotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLock
     tryLock {
       logger.info(s"[$jobName][invoke] - Job started")
       for {
-        filesInReceivedBySDESState <- fileNotificationRepository.getFilesReceivedBySDES()
-        filteredFiles = {
-          logger.info(s"[HandleNotProcessedFilesService][invoke] - Number of records in ${RecordStatusEnum.FILE_RECEIVED_IN_SDES} state: ${filesInReceivedBySDESState.size}")
+        notificationsSentToSDES <- fileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)
+        filesInReceivedBySDESState <- fileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)
+        filteredSentNotifications = {
+          logger.info(s"[HandleStuckNotificationsService][invoke] - Number of records in ${RecordStatusEnum.SENT} state: ${notificationsSentToSDES.size}")
+          notificationsSentToSDES.filter(notification => {
+            notification.updatedAt.plusMinutes(appConfig.numberOfMinutesToWaitUntilNotificationRetried).isBefore(timeMachine.now)
+          })
+        }
+        filteredReceivedFiles = {
+          logger.info(s"[HandleStuckNotificationsService][invoke] - Number of records in ${RecordStatusEnum.FILE_RECEIVED_IN_SDES} state: ${filesInReceivedBySDESState.size}")
           filesInReceivedBySDESState.filter(notification => {
             notification.updatedAt.plusMinutes(appConfig.numberOfMinutesToWaitUntilNotificationRetried).isBefore(timeMachine.now)
           })
         }
-        sequenceOfResults <- Future.sequence(filteredFiles.map {
-          logger.info(s"[HandleNotProcessedFilesService][invoke] - Number of filtered files: ${filteredFiles.size}")
+        sequenceOfResults <- Future.sequence(filteredSentNotifications.map {
+          logger.info(s"[HandleStuckNotificationsService][invoke] - Number of ${RecordStatusEnum.SENT} to process: ${filteredSentNotifications.size}")
+          notification => {
+            PagerDutyHelper.log("invoke", NOTIFICATION_SET_TO_NOT_RECEIVED_IN_SDES_PENDING_RETRY)
+            logger.info(s"[HandleStuckNotificationsService][invoke] - Updating notification (reference: ${notification.reference}) to FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY")
+            fileNotificationRepository.updateFileNotification(notification.reference, RecordStatusEnum.FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY).map(_ => true)
+          }.recover {
+            case e => {
+              PagerDutyHelper.log("invoke", UNKNOWN_PROCESSING_EXCEPTION)
+              logger.error(s"[HandleStuckNotificationsService][invoke] - Exception occurred processing notification, reference: ${notification.reference} - message: $e")
+              false
+            }
+          }
+        } ++filteredReceivedFiles.map {
+          logger.info(s"[HandleStuckNotificationsService][invoke] - Number of filtered files: ${filteredReceivedFiles.size}")
           notification => {
             PagerDutyHelper.log("invoke", NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY)
-            logger.info(s"[NotProcessedFilesService][invoke] - Updating notification (reference: ${notification.reference}) to NOT_PROCESSED_PENDING_RETRY")
+            logger.info(s"[HandleStuckNotificationsService][invoke] - Updating notification (reference: ${notification.reference}) to NOT_PROCESSED_PENDING_RETRY")
             fileNotificationRepository.updateFileNotification(notification.reference, RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY).map(_ => true)
           }.recover {
             case e => {
               PagerDutyHelper.log("invoke", UNKNOWN_PROCESSING_EXCEPTION)
-              logger.error(s"[HandleNotProcessedFilesService][invoke] - Exception occurred processing notification, reference: ${notification.reference} - message: $e")
+              logger.error(s"[HandleStuckNotificationsService][invoke] - Exception occurred processing notification, reference: ${notification.reference} - message: $e")
               false
             }
           }
@@ -78,11 +98,11 @@ class HandleNotProcessedFilesService @Inject()(lockRepositoryProvider: MongoLock
         isSuccess = sequenceOfResults.forall(identity)
       } yield {
         if(isSuccess) {
-          logger.info(s"[HandleNotProcessedFilesService][invoke] - Processed all notifications in batch")
+          logger.info(s"[HandleStuckNotificationsService][invoke] - Processed all notifications in batch")
           Right("Processed all notifications")
         } else {
           PagerDutyHelper.log("invoke", FAILED_TO_PROCESS_FILE_NOTIFICATION)
-          logger.info(s"[HandleNotProcessedFilesService][invoke] - Failed to process all notifications (see previous logs)")
+          logger.info(s"[HandleStuckNotificationsService][invoke] - Failed to process all notifications (see previous logs)")
           Left(FailedToProcessNotifications)
         }
       }

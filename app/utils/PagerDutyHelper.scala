@@ -32,6 +32,7 @@ object PagerDutyHelper {
     final val FAILED_TO_INSERT_FILE_NOTIFICATION = Value
     final val NOTIFICATION_SET_TO_PERMANENT_FAILURE = Value
     final val NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY = Value
+    final val NOTIFICATION_SET_TO_NOT_RECEIVED_IN_SDES_PENDING_RETRY = Value
   }
 
   def log(methodName: String, pagerDutyKey: PagerDutyKeys.Value): Unit = {
