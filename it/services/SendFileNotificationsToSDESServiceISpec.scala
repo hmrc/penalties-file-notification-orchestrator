@@ -26,6 +26,7 @@ import play.api.test.Helpers._
 import repositories.FileNotificationRepository
 import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.Logger.logger
+import utils.PagerDutyHelper.PagerDutyKeys.NOTIFICATION_SET_TO_PERMANENT_FAILURE
 import utils.{IntegrationSpecCommonBase, LogCapturing}
 
 import java.time.LocalDateTime
@@ -101,32 +102,36 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       notificationsInRepo.count(_.status == RecordStatusEnum.SENT) shouldBe 5
     }
 
-    "process the notifications and return Left if there are failures due to 5xx response - setting permanent failure if the retry threshold " +
-      "is met" in new Setup {
-      val pendingNotificationsNearThreshold: Seq[SDESNotificationRecord] = Seq(
+    "process the notifications and set records to permanent failure when the threshold is met or exceeded" in new Setup {
+      val notifications: Seq[SDESNotificationRecord] = Seq(
         notificationRecord.copy(numberOfAttempts = 5),
         notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, numberOfAttempts = 5),
         notificationRecord.copy(reference = "ref3", updatedAt = dateTimeOfNow, numberOfAttempts = 5, status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY),
         notificationRecord.copy(reference = "ref4", updatedAt = dateTimeOfNow, numberOfAttempts = 5, status = RecordStatusEnum.FAILED_PENDING_RETRY),
+        notificationRecord.copy(reference = "ref5", updatedAt = dateTimeOfNow, numberOfAttempts = 4, status = RecordStatusEnum.FAILED_PENDING_RETRY),
         notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2))
       )
-      SDESStub.failedStubResponse(INTERNAL_SERVER_ERROR)
-      await(notificationRepo.insertFileNotifications(pendingNotificationsNearThreshold))
+      SDESStub.successfulStubResponse()
+      await(notificationRepo.insertFileNotifications(notifications))
       withCaptureOfLoggingFrom(logger) {
         logs => {
           val result = await(service.invoke)
-          result.isLeft shouldBe true
-          result.left.toOption.get shouldBe FailedToProcessNotifications
-          logs.exists(_.getMessage.equals("[SendFileNotificationsToSDESService][invoke] - Received 500 status code from connector call to SDES with response body: Something broke")) shouldBe true
-          val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
-          val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
-          val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get
-          val thirdNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref3").get
-          val fourthNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref4").get
+          result.isRight shouldBe true
+          result.toOption.get shouldBe "Processed all notifications"
+          logs.exists(_.getMessage.contains(NOTIFICATION_SET_TO_PERMANENT_FAILURE.toString)) shouldBe true
+          val notificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
+          val firstNotification: SDESNotificationRecord = notificationsInRepo.find(_.reference == "ref").get
+          val secondNotification: SDESNotificationRecord = notificationsInRepo.find(_.reference == "ref1").get
+          val thirdNotification: SDESNotificationRecord = notificationsInRepo.find(_.reference == "ref3").get
+          val fourthNotification: SDESNotificationRecord = notificationsInRepo.find(_.reference == "ref4").get
+          val fifthNotification: SDESNotificationRecord = notificationsInRepo.find(_.reference == "ref2").get
+          val sixthNotification: SDESNotificationRecord = notificationsInRepo.find(_.reference == "ref5").get
           firstNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
           secondNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
           thirdNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
           fourthNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
+          fifthNotification.status shouldBe RecordStatusEnum.PENDING
+          sixthNotification.status shouldBe RecordStatusEnum.SENT
         }
       }
     }
@@ -185,36 +190,6 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
           secondNotification.numberOfAttempts shouldBe 2
           thirdNotification.numberOfAttempts shouldBe 2
           fourthNotification.numberOfAttempts shouldBe 2
-        }
-      }
-    }
-
-    "process the notifications and return Left if there are failures due to 4xx response - setting permanent failure if the retry threshold " +
-      "is met" in new Setup {
-      val pendingNotificationsNearThreshold = Seq(
-        notificationRecord.copy(numberOfAttempts = 5),
-        notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, numberOfAttempts = 5),
-        notificationRecord.copy(reference = "ref3", updatedAt = dateTimeOfNow, numberOfAttempts = 5, status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY),
-        notificationRecord.copy(reference = "ref4", updatedAt = dateTimeOfNow, numberOfAttempts = 5, status = RecordStatusEnum.FAILED_PENDING_RETRY),
-        notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2))
-      )
-      SDESStub.failedStubResponse(BAD_REQUEST)
-      await(notificationRepo.insertFileNotifications(pendingNotificationsNearThreshold))
-      withCaptureOfLoggingFrom(logger) {
-        logs => {
-          val result = await(service.invoke)
-          result.isLeft shouldBe true
-          result.left.toOption.get shouldBe FailedToProcessNotifications
-          logs.exists(_.getMessage.equals("[SendFileNotificationsToSDESService][invoke] - Received 400 status code from connector call to SDES with response body: Something broke")) shouldBe true
-          val pendingNotificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
-          val firstNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref").get
-          val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get
-          val thirdNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref3").get
-          val fourthNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref4").get
-          firstNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
-          secondNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
-          thirdNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
-          fourthNotification.status shouldBe RecordStatusEnum.PERMANENT_FAILURE
         }
       }
     }
