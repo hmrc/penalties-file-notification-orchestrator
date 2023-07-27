@@ -83,6 +83,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
   class Setup(withMongoLockStubs: Boolean = true) {
     reset(mockLockRepository, mockConfig, mockSDESConnector, mockFileNotificationRepository, mockTimeMachine, mockSDESConnector)
     val service = new SendFileNotificationsToSDESService(mockLockRepository, mockFileNotificationRepository, mockSDESConnector, mockTimeMachine, mockConfig)
+    when(mockConfig.get[Int](ArgumentMatchers.eq("notifications.retryThreshold"))(ArgumentMatchers.any())).thenReturn(5)
     when(mockConfig.get[Int](ArgumentMatchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(ArgumentMatchers.any()))
       .thenReturn(mongoLockTimeout)
     when(mockTimeMachine.now).thenReturn(mockDateTime)
@@ -163,24 +164,21 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
     }
 
     "set the record to be a PERMANENT_FAILURE" when {
-      "the threshold has been met and there is a failure" in new Setup {
+      "the threshold has been met" in new Setup {
         val notificationsToSend: Seq[SDESNotificationRecord] = Seq(
           notificationRecord.copy(numberOfAttempts = 5)
         )
         val notificationRecordAsPermanentFailure: SDESNotificationRecord = notificationRecord.copy(numberOfAttempts = 5,
           status = RecordStatusEnum.PERMANENT_FAILURE, updatedAt = mockDateTime)
         when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(notificationsToSend))
-        when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
-          .thenReturn(Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
         when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.eq(notificationRecordAsPermanentFailure)))
           .thenReturn(Future.successful(notificationRecordAsPermanentFailure))
         withCaptureOfLoggingFrom(logger) {
           logs => {
             val result = await(service.invoke)
-            result.isLeft shouldBe true
-            result.left.toOption.get shouldBe FailedToProcessNotifications
+            result.isRight shouldBe true
+            result.toOption.get shouldBe "Processed all notifications"
             eventually {
-              logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_5XX_FROM_SDES.toString)) shouldBe true
               logs.exists(_.getMessage.contains(PagerDutyKeys.NOTIFICATION_SET_TO_PERMANENT_FAILURE.toString)) shouldBe true
             }
           }
@@ -203,6 +201,27 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
             result.left.toOption.get shouldBe FailedToProcessNotifications
             eventually {
               logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_4XX_FROM_SDES.toString)) shouldBe true
+            }
+          }
+        }
+      }
+
+      "a 5xx response has been received" in new Setup {
+        val notificationsToSend: Seq[SDESNotificationRecord] = Seq(notificationRecord)
+        val notificationRecordAsPermanentFailure: SDESNotificationRecord = notificationRecord.copy(status = RecordStatusEnum.PERMANENT_FAILURE,
+          updatedAt = mockDateTime)
+        when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(notificationsToSend))
+        when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
+          .thenReturn(Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
+        when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.eq(notificationRecordAsPermanentFailure)))
+          .thenReturn(Future.successful(notificationRecordAsPermanentFailure))
+        withCaptureOfLoggingFrom(logger) {
+          logs => {
+            val result = await(service.invoke)
+            result.isLeft shouldBe true
+            result.left.toOption.get shouldBe FailedToProcessNotifications
+            eventually {
+              logs.exists(_.getMessage.contains(PagerDutyKeys.RECEIVED_5XX_FROM_SDES.toString)) shouldBe true
             }
           }
         }

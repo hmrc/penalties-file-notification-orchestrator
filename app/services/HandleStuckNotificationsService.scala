@@ -81,7 +81,7 @@ class HandleStuckNotificationsService @Inject()(lockRepositoryProvider: MongoLoc
               false
             }
           }
-        } ++filteredReceivedFiles.map {
+        } ++ filteredReceivedFiles.map {
           logger.info(s"[HandleStuckNotificationsService][invoke] - Number of filtered files: ${filteredReceivedFiles.size}")
           notification => {
             PagerDutyHelper.log("invoke", NOTIFICATION_SET_TO_NOT_PROCESSED_PENDING_RETRY)

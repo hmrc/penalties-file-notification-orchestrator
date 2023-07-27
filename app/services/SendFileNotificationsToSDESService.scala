@@ -19,8 +19,8 @@ package services
 import connectors.SDESConnector
 import models.FailedJobResponses.{FailedToProcessNotifications, UnknownProcessingException}
 import models.notification.RecordStatusEnum.PERMANENT_FAILURE
-import models.{MongoLockResponses, SDESNotificationRecord}
 import models.notification.{RecordStatusEnum, SDESNotification}
+import models.{MongoLockResponses, SDESNotificationRecord}
 import play.api.Configuration
 import play.api.http.Status.NO_CONTENT
 import repositories.FileNotificationRepository
@@ -28,12 +28,11 @@ import scheduler.{ScheduleStatus, ScheduledService}
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.mongo.lock.{LockRepository, LockService, MongoLockRepository}
 import utils.Logger.logger
+import utils.PagerDutyHelper.PagerDutyKeys._
 import utils.{PagerDutyHelper, TimeMachine}
 
 import java.time.LocalDateTime
 import javax.inject.Inject
-import utils.PagerDutyHelper.PagerDutyKeys._
-
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -47,6 +46,7 @@ class SendFileNotificationsToSDESService @Inject()(
 
   val jobName = "SendFileNotificationsToSDESJob"
   lazy val mongoLockTimeoutSeconds: Int = config.get[Int](s"schedules.$jobName.mongoLockTimeout")
+  lazy val retryThreshold: Int = config.get[Int]("notifications.retryThreshold")
 
   lazy val lockKeeper: LockService = new LockService() {
     override val lockId = s"schedules.$jobName"
@@ -66,16 +66,23 @@ class SendFileNotificationsToSDESService @Inject()(
           logger.info(s"[SendFileNotificationsToSDESService][invoke] - Amount of notifications: ${notificationCandidates.size} after filtering")
           Future.sequence(notificationCandidates.map {
             notificationWrapper => {
-              val notificationToSend: SDESNotification = notificationWrapper.notification
-              logger.info(s"[SendFileNotificationsToSDESService][invoke] - Sending notification (reference: ${notificationWrapper.reference}) to SDES")
-              sdesConnector.sendNotificationToSDES(notificationToSend).flatMap {
-                handleSDESResponse(_, notificationWrapper)
-              }.recoverWith {
-                case e => {
-                  PagerDutyHelper.log("invoke", UNKNOWN_EXCEPTION_FROM_SDES)
-                  logger.error(s"[SendFileNotificationsToSDESService][invoke] - Exception occurred processing notifications - message: ${e.getMessage} for reference: ${notificationWrapper.reference}")
-                  val updatedNotification: SDESNotificationRecord = setRecordToPermanentFailure(notificationWrapper)
-                  fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => false)
+              if (notificationWrapper.numberOfAttempts >= retryThreshold) {
+                PagerDutyHelper.log("invoke", NOTIFICATION_SET_TO_PERMANENT_FAILURE)
+                logger.warn(s"[SendFileNotificationsToSDESService][invoke] - Notification (with reference: ${notificationWrapper.reference}) has reached retry threshold of $retryThreshold (number of attempts: ${notificationWrapper.numberOfAttempts}) - setting to $PERMANENT_FAILURE")
+                val updatedNotification: SDESNotificationRecord = setRecordToPermanentFailure(notificationWrapper)
+                fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => true) //Set to true to prevent false positive where files are reported to have not been processed successfully
+              } else {
+                val notificationToSend: SDESNotification = notificationWrapper.notification
+                logger.info(s"[SendFileNotificationsToSDESService][invoke] - Sending notification (reference: ${notificationWrapper.reference}) to SDES")
+                sdesConnector.sendNotificationToSDES(notificationToSend).flatMap {
+                  handleSDESResponse(_, notificationWrapper)
+                }.recoverWith {
+                  case e => {
+                    PagerDutyHelper.log("invoke", UNKNOWN_EXCEPTION_FROM_SDES)
+                    logger.error(s"[SendFileNotificationsToSDESService][invoke] - Exception occurred processing notifications - message: ${e.getMessage} for reference: ${notificationWrapper.reference}")
+                    val updatedNotification: SDESNotificationRecord = setRecordToPermanentFailure(notificationWrapper)
+                    fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => false)
+                  }
                 }
               }
             }
@@ -110,22 +117,15 @@ class SendFileNotificationsToSDESService @Inject()(
       case status if status >= 400 => {
         PagerDutyHelper.logStatusCode("invoke", status)(keyOn5xx = Some(RECEIVED_5XX_FROM_SDES), keyOn4xx = Some(RECEIVED_4XX_FROM_SDES))
         logger.warn(s"[SendFileNotificationsToSDESService][invoke] - Received $status status code from connector call to SDES with response body: ${response.body}")
-        if (notificationWrapper.numberOfAttempts >= 5) {
-          PagerDutyHelper.log("invoke", NOTIFICATION_SET_TO_PERMANENT_FAILURE)
-          logger.info(s"[SendFileNotificationsToSDESService][invoke] - Notification (with reference: ${notificationWrapper.reference}) has reached retry threshold of 5 - setting to $PERMANENT_FAILURE")
-          val updatedNotification: SDESNotificationRecord = setRecordToPermanentFailure(notificationWrapper)
-          fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => false)
-        } else {
-          logger.info(s"[SendFileNotificationsToSDESService][invoke] - Increasing notification retries and nextAttemptAt for reference: ${notificationWrapper.reference}")
-          val updatedNextAttemptAt: LocalDateTime = updateNextAttemptAtTimestamp(notificationWrapper)
-          logger.info(s"[SendFileNotificationsToSDESService][invoke] - Setting nextAttemptAt to: $updatedNextAttemptAt for reference: ${notificationWrapper.reference} (retry count: ${notificationWrapper.numberOfAttempts})")
-          val updatedNotification: SDESNotificationRecord = notificationWrapper.copy(
-            nextAttemptAt = updatedNextAttemptAt,
-            numberOfAttempts = notificationWrapper.numberOfAttempts + 1,
-            updatedAt = timeMachine.now
-          )
-          fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => false)
-        }
+        logger.info(s"[SendFileNotificationsToSDESService][invoke] - Increasing notification retries and nextAttemptAt for reference: ${notificationWrapper.reference}")
+        val updatedNextAttemptAt: LocalDateTime = updateNextAttemptAtTimestamp(notificationWrapper)
+        logger.info(s"[SendFileNotificationsToSDESService][invoke] - Setting nextAttemptAt to: $updatedNextAttemptAt for reference: ${notificationWrapper.reference} (retry count: ${notificationWrapper.numberOfAttempts})")
+        val updatedNotification: SDESNotificationRecord = notificationWrapper.copy(
+          nextAttemptAt = updatedNextAttemptAt,
+          numberOfAttempts = notificationWrapper.numberOfAttempts + 1,
+          updatedAt = timeMachine.now
+        )
+        fileNotificationRepository.updateFileNotification(updatedNotification).map(_ => false)
       }
       case status => throw new MatchError(s"Unknown status ($status) returned when sending file (with reference: ${notificationWrapper.reference}) to SDES")
     }
