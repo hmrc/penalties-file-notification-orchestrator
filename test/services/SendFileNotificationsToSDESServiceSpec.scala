@@ -83,6 +83,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
   class Setup(withMongoLockStubs: Boolean = true) {
     reset(mockLockRepository, mockConfig, mockSDESConnector, mockFileNotificationRepository, mockTimeMachine, mockSDESConnector)
     val service = new SendFileNotificationsToSDESService(mockLockRepository, mockFileNotificationRepository, mockSDESConnector, mockTimeMachine, mockConfig)
+    when(mockConfig.get[Int](ArgumentMatchers.eq("notifications.retryThreshold"))(ArgumentMatchers.any())).thenReturn(5)
     when(mockConfig.get[Int](ArgumentMatchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(ArgumentMatchers.any()))
       .thenReturn(mongoLockTimeout)
     when(mockTimeMachine.now).thenReturn(mockDateTime)
