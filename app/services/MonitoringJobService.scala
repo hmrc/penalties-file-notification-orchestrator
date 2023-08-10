@@ -17,16 +17,16 @@
 package services
 
 import models.MongoLockResponses
+import models.notification.RecordStatusEnum
 import play.api.Configuration
 import repositories.FileNotificationRepository
 import scheduler.{ScheduleStatus, ScheduledService}
-import utils.Logger.logger
-import javax.inject.Inject
-import models.notification.RecordStatusEnum
 import uk.gov.hmrc.mongo.lock.{LockRepository, LockService, MongoLockRepository}
+import utils.Logger.logger
 import utils.PagerDutyHelper
 import utils.PagerDutyHelper.PagerDutyKeys.MONGO_LOCK_UNKNOWN_EXCEPTION
 
+import javax.inject.Inject
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
 

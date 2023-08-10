@@ -29,8 +29,8 @@ import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys.NOTIFICATION_SET_TO_PERMANENT_FAILURE
 import utils.{IntegrationSpecCommonBase, LogCapturing}
 
-import java.time.LocalDateTime
-import java.time.temporal.ChronoUnit
+import java.time.temporal.ChronoUnit.{MINUTES, SECONDS}
+import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
 import scala.concurrent.duration.DurationInt
 
 class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase with LogCapturing {
@@ -45,25 +45,25 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
     await(lockRepository.collection.countDocuments().toFuture()) shouldBe 0
   }
 
-  lazy val dateTimeOfNow: LocalDateTime = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)
+  lazy val dateTimeOfNow: Instant = LocalDateTime.now(ZoneId.of("UTC")).truncatedTo(SECONDS).toInstant(ZoneOffset.UTC)
 
   val notificationRecord: SDESNotificationRecord = SDESNotificationRecord(
     reference = "ref",
     status = RecordStatusEnum.PENDING,
     numberOfAttempts = 1,
-    createdAt = LocalDateTime.of(2020,1,1,1,1),
-    updatedAt = LocalDateTime.of(2020,2,2,2,2),
-    nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
+    createdAt = LocalDateTime.of(2020,1,1,1,1).toInstant(ZoneOffset.UTC),
+    updatedAt = LocalDateTime.of(2020,2,2,2,2).toInstant(ZoneOffset.UTC),
+    nextAttemptAt = LocalDateTime.of(2020,3,3,3,3).toInstant(ZoneOffset.UTC),
     notification = sampleNotification
   )
 
   val pendingNotifications: Seq[SDESNotificationRecord] = Seq(
     notificationRecord,
-    notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, nextAttemptAt = LocalDateTime.of(2020,3,3,3,3)),
-    notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2)),
-    notificationRecord.copy(reference = "ref3", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3), status = RecordStatusEnum.FAILED_PENDING_RETRY),
-    notificationRecord.copy(reference = "ref4", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3), status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY),
-    notificationRecord.copy(reference = "ref5", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3), status = RecordStatusEnum.FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY)
+    notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, nextAttemptAt = LocalDateTime.of(2020,3,3,3,3).toInstant(ZoneOffset.UTC)),
+    notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plus(2, MINUTES)),
+    notificationRecord.copy(reference = "ref3", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3).toInstant(ZoneOffset.UTC), status = RecordStatusEnum.FAILED_PENDING_RETRY),
+    notificationRecord.copy(reference = "ref4", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3).toInstant(ZoneOffset.UTC), status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY),
+    notificationRecord.copy(reference = "ref5", nextAttemptAt = LocalDateTime.of(2020,3,3,3,3).toInstant(ZoneOffset.UTC), status = RecordStatusEnum.FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY)
   )
 
   "tryLock" should {
@@ -93,7 +93,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       result.isRight shouldBe true
       result.toOption.get shouldBe "Processed all notifications"
       val notificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
-      notificationsInRepo.exists(_.equals(notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2)))) shouldBe true
+      notificationsInRepo.exists(_.equals(notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plus(2, MINUTES)))) shouldBe true
       notificationsInRepo.find(_.reference == "ref1").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
       notificationsInRepo.find(_.reference == "ref").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
       notificationsInRepo.find(_.reference == "ref3").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
@@ -109,7 +109,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
         notificationRecord.copy(reference = "ref3", updatedAt = dateTimeOfNow, numberOfAttempts = 5, status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY),
         notificationRecord.copy(reference = "ref4", updatedAt = dateTimeOfNow, numberOfAttempts = 5, status = RecordStatusEnum.FAILED_PENDING_RETRY),
         notificationRecord.copy(reference = "ref5", updatedAt = dateTimeOfNow, numberOfAttempts = 4, status = RecordStatusEnum.FAILED_PENDING_RETRY),
-        notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plusMinutes(2))
+        notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plus(2, MINUTES))
       )
       SDESStub.successfulStubResponse()
       await(notificationRepo.insertFileNotifications(notifications))
@@ -151,10 +151,10 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
           val secondNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref1").get
           val thirdNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref3").get
           val fourthNotification: SDESNotificationRecord = pendingNotificationsInRepo.find(_.reference == "ref4").get
-          firstNotification.nextAttemptAt shouldBe LocalDateTime.of(2020,3,3,3,33)
-          secondNotification.nextAttemptAt shouldBe LocalDateTime.of(2020,3,3,3,33)
-          thirdNotification.nextAttemptAt shouldBe LocalDateTime.of(2020,3,3,3,33)
-          fourthNotification.nextAttemptAt shouldBe LocalDateTime.of(2020,3,3,3,33)
+          firstNotification.nextAttemptAt shouldBe LocalDateTime.of(2020,3,3,3,33).toInstant(ZoneOffset.UTC)
+          secondNotification.nextAttemptAt shouldBe LocalDateTime.of(2020,3,3,3,33).toInstant(ZoneOffset.UTC)
+          thirdNotification.nextAttemptAt shouldBe LocalDateTime.of(2020,3,3,3,33).toInstant(ZoneOffset.UTC)
+          fourthNotification.nextAttemptAt shouldBe LocalDateTime.of(2020,3,3,3,33).toInstant(ZoneOffset.UTC)
           firstNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true
           secondNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true
           thirdNotification.updatedAt.isAfter(dateTimeOfNow) shouldBe true

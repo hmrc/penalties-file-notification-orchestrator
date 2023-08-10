@@ -25,8 +25,8 @@ import play.api.test.Helpers._
 import services.NotificationMongoService
 import utils.IntegrationSpecCommonBase
 
-import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
+import java.time.{LocalDateTime, ZoneId, ZoneOffset}
 import scala.concurrent.Future
 
 class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
@@ -49,9 +49,9 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
     reference = "ref",
     status = RecordStatusEnum.SENT,
     numberOfAttempts = 1,
-    createdAt = LocalDateTime.of(2020,1,1,1,1),
-    updatedAt = LocalDateTime.of(2020,2,2,2,2),
-    nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
+    createdAt = LocalDateTime.of(2020,1,1,1,1).toInstant(ZoneOffset.UTC),
+    updatedAt = LocalDateTime.of(2020,2,2,2,2).toInstant(ZoneOffset.UTC),
+    nextAttemptAt = LocalDateTime.of(2020,3,3,3,3).toInstant(ZoneOffset.UTC),
     notification = sampleNotification
   )
 
@@ -82,9 +82,9 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
         reference = "ref",
         status = RecordStatusEnum.PENDING,
         numberOfAttempts = 1,
-        createdAt = LocalDateTime.of(2020,1,1,1,1),
-        updatedAt = LocalDateTime.of(2020,2,2,2,2),
-        nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
+        createdAt = LocalDateTime.of(2020,1,1,1,1).toInstant(ZoneOffset.UTC),
+        updatedAt = LocalDateTime.of(2020,2,2,2,2).toInstant(ZoneOffset.UTC),
+        nextAttemptAt = LocalDateTime.of(2020,3,3,3,3).toInstant(ZoneOffset.UTC),
         notification = sampleNotification
       )
       val notificationRecord2: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref2", status = RecordStatusEnum.PENDING)
@@ -105,9 +105,9 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
           reference = "ref",
           status = status,
           numberOfAttempts = 1,
-          createdAt = LocalDateTime.of(2020, 1, 1, 1, 1),
-          updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2),
-          nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3),
+          createdAt = LocalDateTime.of(2020, 1, 1, 1, 1).toInstant(ZoneOffset.UTC),
+          updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2).toInstant(ZoneOffset.UTC),
+          nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3).toInstant(ZoneOffset.UTC),
           notification = sampleNotification
         )
         val notificationRecord2: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref3", status = RecordStatusEnum.SENT)
@@ -129,14 +129,14 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
         reference = "ref",
         status = RecordStatusEnum.PENDING,
         numberOfAttempts = 1,
-        createdAt = LocalDateTime.of(2020,1,1,1,1),
-        updatedAt = LocalDateTime.of(2020,2,2,2,2),
-        nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
+        createdAt = LocalDateTime.of(2020,1,1,1,1).toInstant(ZoneOffset.UTC),
+        updatedAt = LocalDateTime.of(2020,2,2,2,2).toInstant(ZoneOffset.UTC),
+        nextAttemptAt = LocalDateTime.of(2020,3,3,3,3).toInstant(ZoneOffset.UTC),
         notification = sampleNotification
       )
       val updatedNotification: SDESNotificationRecord = notificationRecordInPending.copy(
         status = RecordStatusEnum.SENT,
-        updatedAt = dateTimeNow
+        updatedAt = dateTimeNow.toInstant(ZoneOffset.UTC)
       )
       await(repository.insertFileNotifications(Seq(notificationRecordInPending)))
       await(repository.getPendingNotifications()).size shouldBe 1
@@ -152,9 +152,9 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
         reference = "ref",
         status = RecordStatusEnum.PENDING,
         numberOfAttempts = 1,
-        createdAt = LocalDateTime.of(2020,1,1,1,1),
-        updatedAt = LocalDateTime.of(2020,2,2,2,2),
-        nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
+        createdAt = LocalDateTime.of(2020,1,1,1,1).toInstant(ZoneOffset.UTC),
+        updatedAt = LocalDateTime.of(2020,2,2,2,2).toInstant(ZoneOffset.UTC),
+        nextAttemptAt = LocalDateTime.of(2020,3,3,3,3).toInstant(ZoneOffset.UTC),
         notification = sampleNotification
       )
 
@@ -175,9 +175,9 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
         reference = "ref",
         status = RecordStatusEnum.SENT,
         numberOfAttempts = 1,
-        createdAt = LocalDateTime.of(2020, 1, 1, 1, 1),
-        updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2),
-        nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3),
+        createdAt = LocalDateTime.of(2020, 1, 1, 1, 1).toInstant(ZoneOffset.UTC),
+        updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2).toInstant(ZoneOffset.UTC),
+        nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3).toInstant(ZoneOffset.UTC),
         notification = sampleNotification
       )
       await(repository.insertFileNotifications(Seq(notificationRecordInSent)))
@@ -188,7 +188,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       updatedNotification.numberOfAttempts shouldBe 1
       updatedNotification.createdAt shouldBe notificationRecordInSent.createdAt
       updatedNotification.updatedAt.isAfter(notificationRecordInSent.updatedAt) shouldBe true
-      updatedNotification.nextAttemptAt.withSecond(0).withNano(0) shouldBe LocalDateTime.now().withSecond(0).withNano(0)
+      LocalDateTime.ofInstant(updatedNotification.nextAttemptAt, ZoneId.of("UTC")).withSecond(0).withNano(0) shouldBe LocalDateTime.now(ZoneId.of("UTC")).withSecond(0).withNano(0)
     }
 
     "find the existing record and update the fields (incrementing retries when failed - NOT_PROCESSED_PENDING_RETRY)" in new Setup {
@@ -196,9 +196,9 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
         reference = "ref",
         status = RecordStatusEnum.SENT,
         numberOfAttempts = 1,
-        createdAt = LocalDateTime.of(2020, 1, 1, 1, 1),
-        updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2),
-        nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3),
+        createdAt = LocalDateTime.of(2020, 1, 1, 1, 1).toInstant(ZoneOffset.UTC),
+        updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2).toInstant(ZoneOffset.UTC),
+        nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3).toInstant(ZoneOffset.UTC),
         notification = sampleNotification
       )
       await(repository.insertFileNotifications(Seq(notificationRecordInSent)))
@@ -209,7 +209,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       updatedNotification.numberOfAttempts shouldBe 2
       updatedNotification.createdAt shouldBe notificationRecordInSent.createdAt
       updatedNotification.updatedAt.isAfter(notificationRecordInSent.updatedAt) shouldBe true
-      updatedNotification.nextAttemptAt.withSecond(0).withNano(0) shouldBe LocalDateTime.now().plusMinutes(30).withSecond(0).withNano(0)
+      LocalDateTime.ofInstant(updatedNotification.nextAttemptAt, ZoneId.of("UTC")).withSecond(0).withNano(0) shouldBe LocalDateTime.now(ZoneId.of("UTC")).plusMinutes(30).withSecond(0).withNano(0)
     }
 
     "find the existing record and update the fields (incrementing retries when failed - FAILED_PENDING_RETRY)" in new Setup {
@@ -217,9 +217,9 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
         reference = "ref",
         status = RecordStatusEnum.SENT,
         numberOfAttempts = 1,
-        createdAt = LocalDateTime.of(2020, 1, 1, 1, 1),
-        updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2),
-        nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3),
+        createdAt = LocalDateTime.of(2020, 1, 1, 1, 1).toInstant(ZoneOffset.UTC),
+        updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2).toInstant(ZoneOffset.UTC),
+        nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3).toInstant(ZoneOffset.UTC),
         notification = sampleNotification
       )
       await(repository.insertFileNotifications(Seq(notificationRecordInSent)))
@@ -230,7 +230,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       updatedNotification.numberOfAttempts shouldBe 2
       updatedNotification.createdAt shouldBe notificationRecordInSent.createdAt
       updatedNotification.updatedAt.isAfter(notificationRecordInSent.updatedAt) shouldBe true
-      updatedNotification.nextAttemptAt.withSecond(0).withNano(0) shouldBe LocalDateTime.now().plusMinutes(30).withSecond(0).withNano(0)
+      LocalDateTime.ofInstant(updatedNotification.nextAttemptAt, ZoneId.of("UTC")).withSecond(0).withNano(0) shouldBe LocalDateTime.now(ZoneId.of("UTC")).plusMinutes(30).withSecond(0).withNano(0)
     }
   }
 

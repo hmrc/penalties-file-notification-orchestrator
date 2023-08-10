@@ -18,13 +18,20 @@ package utils
 
 import base.SpecBase
 
-import java.time.LocalDateTime
+import java.time.{Instant, LocalDateTime}
 
 class TimeMachineSpec extends SpecBase {
   val timeMachine: TimeMachine = injector.instanceOf[TimeMachine]
-  "now" should {
+  "dateTimeNow" should {
     "return the systems date time" in {
       val nowMinusAFewMillis: LocalDateTime = LocalDateTime.now().minusNanos(100)
+      timeMachine.dateTimeNow.isAfter(nowMinusAFewMillis) shouldBe true
+    }
+  }
+
+  "now" should {
+    "return the systems date time (as an instant)" in {
+      val nowMinusAFewMillis: Instant = Instant.now().minusNanos(100)
       timeMachine.now.isAfter(nowMinusAFewMillis) shouldBe true
     }
   }

@@ -19,9 +19,9 @@ package controllers.actions
 import config.AppConfig
 import config.featureSwitches.{FeatureSwitching, UseInternalAuth}
 import models.auth.AuthRequest
-import uk.gov.hmrc.http.Authorization
 import play.api.mvc.Results._
 import play.api.mvc._
+import uk.gov.hmrc.http.Authorization
 import uk.gov.hmrc.internalauth.client._
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import utils.Logger

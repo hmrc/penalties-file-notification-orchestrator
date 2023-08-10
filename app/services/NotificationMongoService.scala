@@ -16,12 +16,12 @@
 
 package services
 
-import javax.inject.Inject
 import models.SDESNotificationRecord
 import models.notification.SDESNotification
 import repositories.FileNotificationRepository
 import utils.Logger.logger
 
+import javax.inject.Inject
 import scala.concurrent.Future
 
 class NotificationMongoService @Inject()(repo: FileNotificationRepository) {

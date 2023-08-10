@@ -27,8 +27,8 @@ import scheduler.ScheduleStatus
 import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.{IntegrationSpecCommonBase, LogCapturing}
 
-import java.time.LocalDateTime
-import java.time.temporal.ChronoUnit
+import java.time.temporal.ChronoUnit.{SECONDS, MINUTES}
+import java.time.{Instant, LocalDateTime, ZoneOffset}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class HandleStuckNotificationsServiceISpec extends IntegrationSpecCommonBase with LogCapturing {
@@ -43,24 +43,24 @@ class HandleStuckNotificationsServiceISpec extends IntegrationSpecCommonBase wit
     await(lockRepository.collection.countDocuments().toFuture()) shouldBe 0
   }
 
-  lazy val dateTimeOfNow: LocalDateTime = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)
+  lazy val dateTimeOfNow: Instant = LocalDateTime.now().truncatedTo(SECONDS).toInstant(ZoneOffset.UTC)
 
   val notificationRecord: SDESNotificationRecord = SDESNotificationRecord(
     reference = "ref",
     status = RecordStatusEnum.PENDING,
     numberOfAttempts = 1,
-    createdAt = LocalDateTime.of(2020,1,1,1,1),
-    updatedAt = LocalDateTime.of(2020,2,2,2,2),
-    nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
+    createdAt = LocalDateTime.of(2020,1,1,1,1).toInstant(ZoneOffset.UTC),
+    updatedAt = LocalDateTime.of(2020,2,2,2,2).toInstant(ZoneOffset.UTC),
+    nextAttemptAt = LocalDateTime.of(2020,3,3,3,3).toInstant(ZoneOffset.UTC),
     notification = sampleNotification
   )
 
   val pendingNotifications: Seq[SDESNotificationRecord] = Seq(
     notificationRecord,
-    notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3)),
-    notificationRecord.copy(reference = "ref2", updatedAt = dateTimeOfNow.minusMinutes(2), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
-    notificationRecord.copy(reference = "ref3", updatedAt = LocalDateTime.of(2020, 3, 3, 3, 3), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
-    notificationRecord.copy(reference = "ref4", updatedAt = LocalDateTime.of(2020, 3, 3, 3, 3), status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
+    notificationRecord.copy(reference = "ref1", updatedAt = dateTimeOfNow, nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3).toInstant(ZoneOffset.UTC)),
+    notificationRecord.copy(reference = "ref2", updatedAt = dateTimeOfNow.minus(2, MINUTES), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
+    notificationRecord.copy(reference = "ref3", updatedAt = LocalDateTime.of(2020, 3, 3, 3, 3).toInstant(ZoneOffset.UTC), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
+    notificationRecord.copy(reference = "ref4", updatedAt = LocalDateTime.of(2020, 3, 3, 3, 3).toInstant(ZoneOffset.UTC), status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY)
   )
 
   "tryLock" should {
@@ -94,7 +94,7 @@ class HandleStuckNotificationsServiceISpec extends IntegrationSpecCommonBase wit
       notificationsInRepo.find(_.reference == "ref1").get.status shouldBe RecordStatusEnum.PENDING
       notificationsInRepo.find(_.reference == "ref2").get.status shouldBe RecordStatusEnum.FILE_RECEIVED_IN_SDES
       notificationsInRepo.find(_.reference == "ref3").get.status shouldBe RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY
-      notificationsInRepo.find(_.reference == "ref3").get.updatedAt.isAfter(LocalDateTime.of(2020, 2, 2, 2, 2)) shouldBe true
+      notificationsInRepo.find(_.reference == "ref3").get.updatedAt.isAfter(LocalDateTime.of(2020, 2, 2, 2, 2).toInstant(ZoneOffset.UTC)) shouldBe true
       notificationsInRepo.find(_.reference == "ref4").get.status shouldBe RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY
       notificationsInRepo.find(_.reference == "ref4").get.updatedAt.isBefore(dateTimeOfNow) shouldBe true
     }

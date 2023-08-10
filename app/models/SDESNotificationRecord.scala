@@ -16,22 +16,23 @@
 
 package models
 
-import java.time.LocalDateTime
 import models.notification.{RecordStatusEnum, SDESNotification}
 import play.api.libs.json._
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 
+import java.time.Instant
+
 case class SDESNotificationRecord(reference: String,
                                   status: RecordStatusEnum.Value = RecordStatusEnum.PENDING,
                                   numberOfAttempts: Int = 0,
-                                  createdAt: LocalDateTime = LocalDateTime.now(),
-                                  updatedAt: LocalDateTime = LocalDateTime.now(),
-                                  nextAttemptAt: LocalDateTime = LocalDateTime.now(),
+                                  createdAt: Instant = Instant.now(),
+                                  updatedAt: Instant = Instant.now(),
+                                  nextAttemptAt: Instant = Instant.now(),
                                   notification: SDESNotification
                                  )
 
 object SDESNotificationRecord extends MongoJavatimeFormats {
-  implicit val dateFormat: Format[LocalDateTime] = localDateTimeFormat
+  implicit val dateFormat: Format[Instant] = instantFormat
   implicit val mongoFormats: OFormat[SDESNotificationRecord] = Json.format[SDESNotificationRecord]
 }
 

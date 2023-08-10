@@ -31,7 +31,8 @@ import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys._
 import utils.{PagerDutyHelper, TimeMachine}
 
-import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit.{HOURS, MINUTES}
+import java.time.{Instant, LocalDateTime, ZoneId}
 import javax.inject.Inject
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
@@ -62,7 +63,7 @@ class SendFileNotificationsToSDESService @Inject()(
         notifications => {
           logger.info(s"[SendFileNotificationsToSDESService][invoke] - Amount of notifications: ${notifications.size} before filtering")
           val notificationCandidates = notifications.filter(notification =>
-            notification.nextAttemptAt.isEqual(timeMachine.now) || notification.nextAttemptAt.isBefore(timeMachine.now))
+            LocalDateTime.ofInstant(notification.nextAttemptAt, ZoneId.of("UTC")).isEqual(timeMachine.dateTimeNow) || notification.nextAttemptAt.isBefore(timeMachine.now))
           logger.info(s"[SendFileNotificationsToSDESService][invoke] - Amount of notifications: ${notificationCandidates.size} after filtering")
           Future.sequence(notificationCandidates.map {
             notificationWrapper => {
@@ -118,7 +119,7 @@ class SendFileNotificationsToSDESService @Inject()(
         PagerDutyHelper.logStatusCode("invoke", status)(keyOn5xx = Some(RECEIVED_5XX_FROM_SDES), keyOn4xx = Some(RECEIVED_4XX_FROM_SDES))
         logger.warn(s"[SendFileNotificationsToSDESService][invoke] - Received $status status code from connector call to SDES with response body: ${response.body}")
         logger.info(s"[SendFileNotificationsToSDESService][invoke] - Increasing notification retries and nextAttemptAt for reference: ${notificationWrapper.reference}")
-        val updatedNextAttemptAt: LocalDateTime = updateNextAttemptAtTimestamp(notificationWrapper)
+        val updatedNextAttemptAt: Instant = updateNextAttemptAtTimestamp(notificationWrapper)
         logger.info(s"[SendFileNotificationsToSDESService][invoke] - Setting nextAttemptAt to: $updatedNextAttemptAt for reference: ${notificationWrapper.reference} (retry count: ${notificationWrapper.numberOfAttempts})")
         val updatedNotification: SDESNotificationRecord = notificationWrapper.copy(
           nextAttemptAt = updatedNextAttemptAt,
@@ -145,13 +146,13 @@ class SendFileNotificationsToSDESService @Inject()(
     }
   }
 
-  def updateNextAttemptAtTimestamp(record: SDESNotificationRecord): LocalDateTime = {
+  def updateNextAttemptAtTimestamp(record: SDESNotificationRecord): Instant = {
     record.numberOfAttempts match {
-      case 0 => record.nextAttemptAt.plusMinutes(1)
-      case 1 => record.nextAttemptAt.plusMinutes(30)
-      case 2 => record.nextAttemptAt.plusHours(2)
-      case 3 => record.nextAttemptAt.plusHours(4)
-      case 4 => record.nextAttemptAt.plusHours(8)
+      case 0 => record.nextAttemptAt.plus(1, MINUTES)
+      case 1 => record.nextAttemptAt.plus(30, MINUTES)
+      case 2 => record.nextAttemptAt.plus(2, HOURS)
+      case 3 => record.nextAttemptAt.plus(4, HOURS)
+      case 4 => record.nextAttemptAt.plus(8, HOURS)
     }
   }
 

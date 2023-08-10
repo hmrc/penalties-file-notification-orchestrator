@@ -18,9 +18,9 @@ package models.monitoring
 
 import models.SDESFileNotificationEnum
 import play.api.libs.json.JsValue
+import utils.JsonUtils
 
 import java.time.LocalDateTime
-import utils.JsonUtils
 
 case class FileNotificationStatusAuditModel(
                                             fileStatus: SDESFileNotificationEnum.Value,

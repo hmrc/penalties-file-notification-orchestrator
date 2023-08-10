@@ -16,9 +16,10 @@
 
 package utils
 
-import java.time.LocalDateTime
+import java.time.{Instant, LocalDateTime}
 import javax.inject.Inject
 
 class TimeMachine @Inject()() {
-  def now: LocalDateTime = LocalDateTime.now()
+  def now: Instant = Instant.now()
+  def dateTimeNow: LocalDateTime = LocalDateTime.now()
 }

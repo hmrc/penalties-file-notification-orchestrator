@@ -26,7 +26,7 @@ import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.Logger.logger
 import utils.{IntegrationSpecCommonBase, LogCapturing}
 
-import java.time.LocalDateTime
+import java.time.{LocalDateTime, ZoneOffset}
 import scala.concurrent.duration.DurationInt
 
 class MonitoringJobServiceISpec extends IntegrationSpecCommonBase with LogCapturing {
@@ -58,9 +58,9 @@ class MonitoringJobServiceISpec extends IntegrationSpecCommonBase with LogCaptur
     reference = "ref",
     status = RecordStatusEnum.PENDING,
     numberOfAttempts = 1,
-    createdAt = LocalDateTime.of(2020,1,1,1,1),
-    updatedAt = LocalDateTime.of(2020,2,2,2,2),
-    nextAttemptAt = LocalDateTime.of(2020,3,3,3,3),
+    createdAt = LocalDateTime.of(2020, 1, 1, 1, 1).toInstant(ZoneOffset.UTC),
+    updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2).toInstant(ZoneOffset.UTC),
+    nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3).toInstant(ZoneOffset.UTC),
     notification = sampleNotification
   )
 

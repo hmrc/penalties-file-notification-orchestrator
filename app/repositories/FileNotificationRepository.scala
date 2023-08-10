@@ -33,7 +33,8 @@ import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys._
 import utils.{PagerDutyHelper, TimeMachine}
 
-import java.time.LocalDateTime
+import java.time.Instant
+import java.time.temporal.ChronoUnit.MINUTES
 import java.util.concurrent.TimeUnit
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
@@ -52,7 +53,7 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
       IndexModel(ascending("createdAt"), IndexOptions().expireAfter(appConfig.notificationTtl, TimeUnit.DAYS))
     )) with MongoJavatimeFormats {
 
-  implicit val dateFormat: Format[LocalDateTime] = localDateTimeFormat
+  implicit val dateFormat: Format[Instant] = instantFormat
   implicit val mongoFormats: OFormat[SDESNotificationRecord] = Json.format[SDESNotificationRecord]
 
   def insertFileNotifications(records: Seq[SDESNotificationRecord]): Future[Boolean] = {
@@ -79,7 +80,7 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
     logger.info(s"[FileNotificationRepository][updateFileNotification] - Updating record $reference in Mongo")
     collection.findOneAndUpdate(equal("reference", reference), combine(
       if(updatedStatus == NOT_PROCESSED_PENDING_RETRY || updatedStatus == FAILED_PENDING_RETRY || updatedStatus == FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY)
-        set("nextAttemptAt", Codecs.toBson(timeMachine.now.plusMinutes(appConfig.minutesUntilNextAttemptOnCallbackFailure)))
+        set("nextAttemptAt", Codecs.toBson(timeMachine.now.plus(appConfig.minutesUntilNextAttemptOnCallbackFailure, MINUTES)))
       else set("nextAttemptAt", Codecs.toBson(timeMachine.now)),
       set("status", updatedStatus.toString),
       inc("numberOfAttempts", if(updatedStatus == NOT_PROCESSED_PENDING_RETRY || updatedStatus == FAILED_PENDING_RETRY || updatedStatus == FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY) 1 else 0),
