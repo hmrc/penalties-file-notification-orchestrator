@@ -18,7 +18,7 @@ package scheduler
 
 import akka.actor.{Actor, ActorLogging, Props}
 import scheduler.SchedulingActor._
-import services.{MonitoringJobService, HandleStuckNotificationsService, SendFileNotificationsToSDESService}
+import services.{HandleStuckNotificationsService, MonitoringJobService, SendFileNotificationsToSDESService}
 import utils.Logger.logger
 
 class SchedulingActor extends Actor with ActorLogging {

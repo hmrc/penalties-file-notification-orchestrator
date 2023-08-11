@@ -18,8 +18,6 @@ package controllers
 
 import config.AppConfig
 import controllers.actions.InternalAuthActions
-
-import javax.inject.Inject
 import models.notification.SDESNotification
 import play.api.libs.json.{Json, Reads}
 import play.api.mvc.{Action, AnyContent, ControllerComponents}
@@ -30,6 +28,7 @@ import utils.Logger.logger
 import utils.PagerDutyHelper
 import utils.PagerDutyHelper.PagerDutyKeys._
 
+import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 
 class OrchestratorController @Inject()(mongoService: NotificationMongoService,

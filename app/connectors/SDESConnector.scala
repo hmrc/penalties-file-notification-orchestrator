@@ -18,11 +18,11 @@ package connectors
 
 import config.AppConfig
 import models.notification.SDESNotification
-import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpClient, HttpResponse}
-import javax.inject.Inject
-
-import scala.concurrent.{ExecutionContext, Future}
 import uk.gov.hmrc.http.HttpReads.Implicits._
+import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpClient, HttpResponse}
+
+import javax.inject.Inject
+import scala.concurrent.{ExecutionContext, Future}
 
 class SDESConnector @Inject()(config: AppConfig,
                               httpClient: HttpClient) {

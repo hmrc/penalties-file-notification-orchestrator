@@ -16,7 +16,7 @@
 
 package models.notification
 
-import play.api.libs.json.{Format, JsError, JsResult, JsString, JsSuccess, JsValue}
+import play.api.libs.json._
 
 object RecordStatusEnum extends Enumeration {
   val PENDING: RecordStatusEnum.Value = Value

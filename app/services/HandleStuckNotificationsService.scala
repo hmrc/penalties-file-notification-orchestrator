@@ -29,6 +29,7 @@ import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys._
 import utils.{PagerDutyHelper, TimeMachine}
 
+import java.time.temporal.ChronoUnit.MINUTES
 import javax.inject.Inject
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
@@ -59,13 +60,13 @@ class HandleStuckNotificationsService @Inject()(lockRepositoryProvider: MongoLoc
         filteredSentNotifications = {
           logger.info(s"[HandleStuckNotificationsService][invoke] - Number of records in ${RecordStatusEnum.SENT} state: ${notificationsSentToSDES.size}")
           notificationsSentToSDES.filter(notification => {
-            notification.updatedAt.plusMinutes(appConfig.numberOfMinutesToWaitUntilNotificationRetried).isBefore(timeMachine.now)
+            notification.updatedAt.plus(appConfig.numberOfMinutesToWaitUntilNotificationRetried, MINUTES).isBefore(timeMachine.now)
           })
         }
         filteredReceivedFiles = {
           logger.info(s"[HandleStuckNotificationsService][invoke] - Number of records in ${RecordStatusEnum.FILE_RECEIVED_IN_SDES} state: ${filesInReceivedBySDESState.size}")
           filesInReceivedBySDESState.filter(notification => {
-            notification.updatedAt.plusMinutes(appConfig.numberOfMinutesToWaitUntilNotificationRetried).isBefore(timeMachine.now)
+            notification.updatedAt.plus(appConfig.numberOfMinutesToWaitUntilNotificationRetried, MINUTES).isBefore(timeMachine.now)
           })
         }
         sequenceOfResults <- Future.sequence(filteredSentNotifications.map {

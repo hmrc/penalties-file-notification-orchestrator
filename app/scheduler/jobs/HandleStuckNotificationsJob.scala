@@ -17,13 +17,13 @@
 package scheduler.jobs
 
 import akka.actor.ActorSystem
-
-import javax.inject.Inject
 import play.api.Configuration
 import play.api.inject.ApplicationLifecycle
 import scheduler.ScheduledJob
 import scheduler.SchedulingActor.HandleStuckNotificationsMessage
 import services.HandleStuckNotificationsService
+
+import javax.inject.Inject
 
 class HandleStuckNotificationsJob @Inject()(val config: Configuration,
                                             val handleStuckNotificationsService: HandleStuckNotificationsService,

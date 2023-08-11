@@ -31,7 +31,8 @@ import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys
 import utils.{LogCapturing, TimeMachine}
 
-import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit.{HOURS, MINUTES}
+import java.time.{Instant, LocalDateTime, ZoneOffset}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -47,7 +48,7 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
   val mongoLockTimeout: Int = 123
   val releaseDuration: Duration = mongoLockTimeout.seconds
 
-  val mockDateTime: LocalDateTime = LocalDateTime.of(2022, 1, 1, 0, 0, 0)
+  val mockDateTime: Instant = LocalDateTime.of(2022, 1, 1, 0, 0, 0).toInstant(ZoneOffset.UTC)
   val notification: SDESNotification = SDESNotification(
     informationType = "info",
     file = SDESNotificationFile(
@@ -66,7 +67,7 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
     reference = "ref1",
     status = RecordStatusEnum.PENDING,
     numberOfAttempts = 1,
-    createdAt = mockDateTime.minusHours(1),
+    createdAt = mockDateTime.minus(1, HOURS),
     updatedAt = mockDateTime,
     nextAttemptAt = mockDateTime,
     notification = notification
@@ -75,7 +76,7 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
   val notificationsInDifferentStates: Seq[SDESNotificationRecord] = Seq(
     notificationRecord,
     notificationRecord.copy(reference= "ref2", updatedAt = mockDateTime.minusSeconds(1), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
-    notificationRecord.copy(reference = "ref3", updatedAt = mockDateTime.plusHours(1), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES)
+    notificationRecord.copy(reference = "ref3", updatedAt = mockDateTime.plus(1, HOURS), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES)
   )
 
   class Setup(withMongoLockStubs: Boolean = true) {
@@ -83,7 +84,7 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
     val service = new HandleStuckNotificationsService(mockLockRepository, mockFileNotificationRepository, mockTimeMachine, mockConfig, appConfig)
     when(mockConfig.get[Int](ArgumentMatchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(ArgumentMatchers.any()))
       .thenReturn(mongoLockTimeout)
-    when(mockTimeMachine.now).thenReturn(mockDateTime.plusMinutes(appConfig.numberOfMinutesToWaitUntilNotificationRetried))
+    when(mockTimeMachine.now).thenReturn(mockDateTime.plus(appConfig.numberOfMinutesToWaitUntilNotificationRetried, MINUTES))
     if (withMongoLockStubs) {
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
@@ -105,7 +106,7 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
       when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any())).thenReturn(Future.successful(
-        notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())
+        notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now().toInstant(ZoneOffset.UTC))
       ))
       val result = await(service.invoke)
       result.isRight shouldBe true
@@ -118,7 +119,7 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
       when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any()))
-        .thenReturn(Future.failed(exception), Future.successful(notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now())))
+        .thenReturn(Future.failed(exception), Future.successful(notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now().toInstant(ZoneOffset.UTC))))
       withCaptureOfLoggingFrom(logger) {
         logs => {
           val result = await(service.invoke)

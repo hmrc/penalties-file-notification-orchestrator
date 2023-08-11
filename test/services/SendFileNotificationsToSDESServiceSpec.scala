@@ -32,7 +32,8 @@ import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys
 import utils.{LogCapturing, TimeMachine}
 
-import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit.{HOURS, MINUTES}
+import java.time.{Instant, LocalDateTime, ZoneOffset}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -49,7 +50,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
   val mongoLockTimeout: Int = 123
   val releaseDuration: Duration = mongoLockTimeout.seconds
 
-  val mockDateTime: LocalDateTime = LocalDateTime.of(2022, 1, 1, 0, 0, 0)
+  val mockDateTime: Instant = LocalDateTime.of(2022, 1, 1, 0, 0, 0).toInstant(ZoneOffset.UTC)
   val notification: SDESNotification = SDESNotification(
     informationType = "info",
     file = SDESNotificationFile(
@@ -68,7 +69,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
     reference = "ref",
     status = RecordStatusEnum.PENDING,
     numberOfAttempts = 1,
-    createdAt = mockDateTime.minusHours(1),
+    createdAt = mockDateTime.minus(1, HOURS),
     updatedAt = mockDateTime,
     nextAttemptAt = mockDateTime,
     notification = notification
@@ -86,6 +87,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
     when(mockConfig.get[Int](ArgumentMatchers.eq("notifications.retryThreshold"))(ArgumentMatchers.any())).thenReturn(5)
     when(mockConfig.get[Int](ArgumentMatchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(ArgumentMatchers.any()))
       .thenReturn(mongoLockTimeout)
+    when(mockTimeMachine.dateTimeNow).thenReturn(LocalDateTime.of(2022, 1, 1, 0, 0, 0))
     when(mockTimeMachine.now).thenReturn(mockDateTime)
     if (withMongoLockStubs) {
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
@@ -106,7 +108,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
     "process the notifications and return Right if they all succeed - only process PENDING notifications where nextAttemptAt <= now" in new Setup {
       when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotifications))
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any())).thenReturn(Future.successful(
-        notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = LocalDateTime.now())
+        notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = LocalDateTime.now().toInstant(ZoneOffset.UTC))
       ))
       when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
         .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
@@ -120,7 +122,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
     "process the notifications and return Left if some fail" in new Setup {
       when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(pendingNotifications))
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any())).thenReturn(Future.successful(
-        notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = LocalDateTime.now())
+        notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = LocalDateTime.now().toInstant(ZoneOffset.UTC))
       ))
       when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
         .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")), Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
@@ -137,7 +139,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
       }
       verify(mockSDESConnector, times(2)).sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any())
       val updatedNotificationRecordSent: SDESNotificationRecord = notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = mockDateTime)
-      val updatedNotificationRecordPending: SDESNotificationRecord = notificationRecord.copy(status = RecordStatusEnum.PENDING, updatedAt = mockDateTime, numberOfAttempts = 2, nextAttemptAt = mockDateTime.plusMinutes(30).minusSeconds(1))
+      val updatedNotificationRecordPending: SDESNotificationRecord = notificationRecord.copy(status = RecordStatusEnum.PENDING, updatedAt = mockDateTime, numberOfAttempts = 2, nextAttemptAt = mockDateTime.plus(30, MINUTES).minusSeconds(1))
       verify(mockFileNotificationRepository, times(1)).updateFileNotification(ArgumentMatchers.eq(updatedNotificationRecordSent))
       verify(mockFileNotificationRepository, times(1)).updateFileNotification(ArgumentMatchers.eq(updatedNotificationRecordPending))
     }
@@ -254,7 +256,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
         notificationRecord
       )
       val notificationRecordIncreasedAttempt: SDESNotificationRecord = notificationRecord.copy(numberOfAttempts = 2, status = RecordStatusEnum.PENDING,
-        nextAttemptAt = mockDateTime.plusMinutes(30))
+        nextAttemptAt = mockDateTime.plus(30, MINUTES))
       when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(notificationsToSend))
       when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
         .thenReturn(Future.successful(HttpResponse(INTERNAL_SERVER_ERROR, "")))
@@ -374,27 +376,27 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
   "updateNextAttemptAtTimestamp" should {
     "add 1 minute if the numberOfAttempts is 0" in new Setup {
       val notificationRecordWithZeroAttempts: SDESNotificationRecord = notificationRecord.copy(numberOfAttempts = 0)
-      service.updateNextAttemptAtTimestamp(notificationRecordWithZeroAttempts) shouldBe mockDateTime.plusMinutes(1)
+      service.updateNextAttemptAtTimestamp(notificationRecordWithZeroAttempts) shouldBe mockDateTime.plus(1, MINUTES)
     }
 
     "add 30 minutes if the numberOfAttempts is 1" in new Setup {
       val notificationRecordWithOneAttempt: SDESNotificationRecord = notificationRecord.copy(numberOfAttempts = 1)
-      service.updateNextAttemptAtTimestamp(notificationRecordWithOneAttempt) shouldBe mockDateTime.plusMinutes(30)
+      service.updateNextAttemptAtTimestamp(notificationRecordWithOneAttempt) shouldBe mockDateTime.plus(30, MINUTES)
     }
 
     "add 2 hours if the numberOfAttempts is 2" in new Setup {
       val notificationRecordWithTwoAttempts: SDESNotificationRecord = notificationRecord.copy(numberOfAttempts = 2)
-      service.updateNextAttemptAtTimestamp(notificationRecordWithTwoAttempts) shouldBe mockDateTime.plusHours(2)
+      service.updateNextAttemptAtTimestamp(notificationRecordWithTwoAttempts) shouldBe mockDateTime.plus(2, HOURS)
     }
 
     "add 4 hours if the numberOfAttempts is 3" in new Setup {
       val notificationRecordWithThreeAttempts: SDESNotificationRecord = notificationRecord.copy(numberOfAttempts = 3)
-      service.updateNextAttemptAtTimestamp(notificationRecordWithThreeAttempts) shouldBe mockDateTime.plusHours(4)
+      service.updateNextAttemptAtTimestamp(notificationRecordWithThreeAttempts) shouldBe mockDateTime.plus(4, HOURS)
     }
 
     "add 8 hours if the numberOfAttempts is 4" in new Setup {
       val notificationRecordWithFourAttempts: SDESNotificationRecord = notificationRecord.copy(numberOfAttempts = 4)
-      service.updateNextAttemptAtTimestamp(notificationRecordWithFourAttempts) shouldBe mockDateTime.plusHours(8)
+      service.updateNextAttemptAtTimestamp(notificationRecordWithFourAttempts) shouldBe mockDateTime.plus(8, HOURS)
     }
   }
 }
