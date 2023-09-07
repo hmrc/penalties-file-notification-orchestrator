@@ -18,7 +18,6 @@ package config.featureSwitches
 
 import base.SpecBase
 import config.AppConfig
-import org.mockito.ArgumentMatchers.any
 import org.scalatest.BeforeAndAfterAll
 import play.api.Configuration
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -52,23 +51,24 @@ class FeatureSwitchingSpec extends SpecBase with BeforeAndAfterAll with FeatureS
     }
   }
 
-  "isEnabled" should {
-    s"return true if feature switch is enabled" in new Setup {
-      featureSwitching.enableFeatureSwitch(UseInternalAuth)
-      featureSwitching.isEnabled(UseInternalAuth) shouldBe true
-    }
-
-    s"return false if feature switch is disabled" in new Setup {
-      featureSwitching.disableFeatureSwitch(UseInternalAuth)
-      featureSwitching.isEnabled(UseInternalAuth) shouldBe false
-    }
-
-    "return true if system props is empty but config has value" in new Setup {
-      when(mockConfig.get[Boolean](any())(any()))
-        .thenReturn(true)
-      featureSwitching.isEnabled(UseInternalAuth) shouldBe true
-    }
-  }
+// No feature switches setup, worth keeping in case more are added in the future
+//  "isEnabled" should {
+//    s"return true if feature switch is enabled" in new Setup {
+//      featureSwitching.enableFeatureSwitch(UseInternalAuth)
+//      featureSwitching.isEnabled(UseInternalAuth) shouldBe true
+//    }
+//
+//    s"return false if feature switch is disabled" in new Setup {
+//      featureSwitching.disableFeatureSwitch(UseInternalAuth)
+//      featureSwitching.isEnabled(UseInternalAuth) shouldBe false
+//    }
+//
+//    "return true if system props is empty but config has value" in new Setup {
+//      when(mockConfig.get[Boolean](any())(any()))
+//        .thenReturn(true)
+//      featureSwitching.isEnabled(UseInternalAuth) shouldBe true
+//    }
+//  }
 
   "enableFeatureSwitch" should {
     FeatureSwitch.listOfAllFeatureSwitches.foreach(

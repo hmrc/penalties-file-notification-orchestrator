@@ -29,10 +29,10 @@ class SDESConnector @Inject()(config: AppConfig,
 
   def sendNotificationToSDES(notification: SDESNotification)(implicit ec: ExecutionContext): Future[HttpResponse] = {
     val sdesHeaders = Seq(
-      "x-client-id" -> config.urlHeaderAuthorisation,
+      "x-client-id" -> config.sdesOutboundBearerToken,
       "Content-Type" -> "application/json"
     )
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier(authorization = Some(Authorization(config.urlHeaderAuthorisation)))
+    implicit val headerCarrier: HeaderCarrier = HeaderCarrier(authorization = Some(Authorization(config.sdesOutboundBearerToken)))
     httpClient.POST[SDESNotification, HttpResponse](
       url = config.sdesUrl,
       body = notification,

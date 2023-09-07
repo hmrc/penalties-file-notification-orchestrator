@@ -41,7 +41,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
   class Setup {
     await(notificationRepo.collection.deleteMany(Document()).toFuture())
     await(lockRepository.collection.deleteMany(Document()).toFuture())
-    await(lockRepository.ensureIndexes)
+    await(lockRepository.ensureIndexes())
     await(lockRepository.collection.countDocuments().toFuture()) shouldBe 0
   }
 

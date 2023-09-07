@@ -52,7 +52,7 @@ class SDESConnectorSpec extends SpecBase {
   "sendNotificationsToSDES" should {
     "post the notification to the app config value and return the result" in new Setup {
       when(mockAppConfig.sdesUrl).thenReturn("stub/notifications/fileready")
-      when(mockAppConfig.urlHeaderAuthorisation).thenReturn("Bearer 12345")
+      when(mockAppConfig.sdesOutboundBearerToken).thenReturn("Bearer 12345")
       val hcArgumentCaptor: ArgumentCaptor[HeaderCarrier] = ArgumentCaptor.forClass(classOf[HeaderCarrier])
       when(mockHttpClient.POST[SDESNotification, HttpResponse](ArgumentMatchers.eq("stub/notifications/fileready"),
         ArgumentMatchers.any(),

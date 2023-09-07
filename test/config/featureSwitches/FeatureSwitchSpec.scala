@@ -27,12 +27,11 @@ class FeatureSwitchSpec extends SpecBase {
     val featureSwitching: FeatureSwitching = new FeatureSwitching {
       override implicit val appConfig: AppConfig = mockAppConfig
     }
-    sys.props -= UseInternalAuth.name
   }
 
   "listOfAllFeatureSwitches" should {
     "be all the featureswitches in the app" in {
-      FeatureSwitch.listOfAllFeatureSwitches shouldBe List(UseInternalAuth)
+      FeatureSwitch.listOfAllFeatureSwitches shouldBe List()
     }
   }
 

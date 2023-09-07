@@ -18,19 +18,14 @@ package controllers
 
 import base.SpecBase
 import config.AppConfig
-import config.featureSwitches.UseInternalAuth
 import models.notification._
 import org.mockito.ArgumentMatchers
 import org.scalatest.concurrent.Eventually.eventually
 import play.api.libs.json.{JsValue, Json}
 import play.api.mvc.{ControllerComponents, Result}
-import play.api.test.FakeRequest
 import play.api.test.Helpers._
 import repositories.FileNotificationRepository
 import services.NotificationMongoService
-import uk.gov.hmrc.http.UpstreamErrorResponse
-import uk.gov.hmrc.internalauth.client.test.{BackendAuthComponentsStub, StubBehaviour}
-import uk.gov.hmrc.internalauth.client.{BackendAuthComponents, Retrieval}
 import utils.LogCapturing
 import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys
@@ -43,15 +38,10 @@ class OrchestratorControllerSpec extends SpecBase with LogCapturing {
   val mockService: NotificationMongoService = mock[NotificationMongoService]
   implicit val cc: ControllerComponents = stubControllerComponents()
   val mockAppConfig: AppConfig = mock[AppConfig]
-  lazy val mockAuth: StubBehaviour = mock[StubBehaviour]
-  lazy val authComponent: BackendAuthComponents = BackendAuthComponentsStub(mockAuth)
 
   class Setup() {
-    sys.props -= UseInternalAuth.name
-    reset(mockAppConfig, mockRepo, mockAuth, mockService)
-    when(mockAuth.stubAuth(ArgumentMatchers.any(), ArgumentMatchers.any[Retrieval[Unit]])).thenReturn(Future.unit)
-    when(mockAppConfig.isFeatureSwitchEnabled(ArgumentMatchers.eq(UseInternalAuth))).thenReturn(true)
-    val controller = new OrchestratorController(mockService, cc)(implicitly, mockAppConfig, authComponent)
+    reset(mockAppConfig, mockRepo, mockService)
+    val controller = new OrchestratorController(mockService, cc)(implicitly, mockAppConfig)
   }
 
   val notifications: Seq[SDESNotification] = Seq(
@@ -181,21 +171,6 @@ class OrchestratorControllerSpec extends SpecBase with LogCapturing {
             }
           }
         }
-      }
-    }
-
-    "return UNAUTHORIZED (401)" when {
-      "no authentication has been provided" in new Setup {
-        val result: Future[Result] = controller.receiveSDESNotifications()(FakeRequest("GET", "/").withJsonBody(sdesJson))
-        status(result) shouldBe UNAUTHORIZED
-      }
-    }
-
-    "return FORBIDDEN (403)" when {
-      "the calling service is not authenticated" in new Setup {
-        when(mockAuth.stubAuth(ArgumentMatchers.any(), ArgumentMatchers.any())).thenReturn(Future.failed(UpstreamErrorResponse("FORBIDDEN", FORBIDDEN)))
-        val result: Future[Result] = controller.receiveSDESNotifications()(fakeRequest.withJsonBody(sdesJson))
-        status(result) shouldBe FORBIDDEN
       }
     }
   }

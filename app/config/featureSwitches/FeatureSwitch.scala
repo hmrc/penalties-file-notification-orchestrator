@@ -22,10 +22,6 @@ sealed trait FeatureSwitch {
 
 object FeatureSwitch {
   val prefix: String = "feature-switch"
-  val listOfAllFeatureSwitches: List[FeatureSwitch] = List(UseInternalAuth)
-}
-
-case object UseInternalAuth extends FeatureSwitch {
-  override val name: String = s"${FeatureSwitch.prefix}.use-internal-auth"
+  val listOfAllFeatureSwitches: List[FeatureSwitch] = List()
 }
 
