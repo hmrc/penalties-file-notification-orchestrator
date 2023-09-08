@@ -35,7 +35,7 @@ class MonitoringJobServiceISpec extends IntegrationSpecCommonBase with LogCaptur
     val service: MonitoringJobService = app.injector.instanceOf[MonitoringJobService]
     val repo: FileNotificationRepository = app.injector.instanceOf[FileNotificationRepository]
     await(lockRepository.collection.deleteMany(Document()).toFuture())
-    await(lockRepository.ensureIndexes)
+    await(lockRepository.ensureIndexes())
     await(lockRepository.collection.countDocuments().toFuture()) shouldBe 0
     await(repo.collection.deleteMany(Document()).toFuture())
     await(repo.collection.countDocuments().toFuture()) shouldBe 0

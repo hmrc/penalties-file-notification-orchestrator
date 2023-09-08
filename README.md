@@ -23,14 +23,6 @@ The service manager configuration name for this service is: `PENALTIES_FILE_NOTI
 
 This service is dependent on other services, all dependent services can be started with `sm2 --start PENALTIES_ALL` (this will also start the penalties file notification orchestrator microservice so you may need to stop it via `sm2 --stop PENALTIES_FILE_NOTIFICATION_ORCHESTRATOR`).
 
-## Authentication
-
-This service is protected by service-to-service authentication. Currently, only the [Penalties backend](https://github.com/hmrc/penalties) can call this service. 
-
-A valid token needs to be created in the internal auth service to be used in calls from the Penalties backend.
-
-See https://github.com/hmrc/internal-auth#endpoints on how to create a valid token to use in the Penalties backend service.
-
 ## Testing
 
 This service can be tested with SBT via `sbt test it:test`

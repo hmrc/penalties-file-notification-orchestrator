@@ -17,12 +17,10 @@
 package controllers
 
 import config.AppConfig
-import controllers.actions.InternalAuthActions
 import models.notification.SDESNotification
 import play.api.libs.json.{Json, Reads}
 import play.api.mvc.{Action, AnyContent, ControllerComponents}
 import services.NotificationMongoService
-import uk.gov.hmrc.internalauth.client.BackendAuthComponents
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import utils.Logger.logger
 import utils.PagerDutyHelper
@@ -32,11 +30,11 @@ import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 
 class OrchestratorController @Inject()(mongoService: NotificationMongoService,
-                                       cc: ControllerComponents)(implicit ec: ExecutionContext,
-                                                                 val appConfig: AppConfig,
-                                                                 val auth: BackendAuthComponents) extends BackendController(cc) with InternalAuthActions {
+                                       cc: ControllerComponents)
+                                      (implicit ec: ExecutionContext,
+                                       val appConfig: AppConfig) extends BackendController(cc) {
 
-  def receiveSDESNotifications(): Action[AnyContent] = authoriseService.async {
+  def receiveSDESNotifications(): Action[AnyContent] = Action.async {
     implicit request => {
       request.body.asJson.fold({
         PagerDutyHelper.log("receiveSDESNotifications", FAILED_TO_VALIDATE_REQUEST_AS_JSON)

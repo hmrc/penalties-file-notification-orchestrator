@@ -16,7 +16,6 @@
 
 package config
 
-import config.featureSwitches.FeatureSwitch
 import play.api.Configuration
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
@@ -29,9 +28,9 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
 
   lazy val useStubForSDESCall: Boolean = config.get[Boolean]("feature-switch.useStubForSDESCall")
 
-  lazy val urlHeaderAuthorisation: String = config.get[String]("sdes.outboundBearerToken")
+  lazy val sdesOutboundBearerToken: String = config.get[String]("sdes.outboundBearerToken")
 
-  private val sdesBaseUrl: String = {
+  lazy val sdesBaseUrl: String = {
     if (useStubForSDESCall) servicesConfig.baseUrl("penalties-stub") + "/penalties-stub"
     else servicesConfig.baseUrl("sdes")
   }
@@ -43,6 +42,4 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
   lazy val minutesUntilNextAttemptOnCallbackFailure: Int = config.get[Int]("notifications.minutesUntilRetryOnCallbackFailure")
 
   lazy val numberOfMinutesToWaitUntilNotificationRetried: Int = config.get[Int]("notifications.numberOfMinutesToWaitUntilNotificationRetried")
-
-  def isFeatureSwitchEnabled(featureSwitch: FeatureSwitch): Boolean = config.get[Boolean](featureSwitch.name)
 }
