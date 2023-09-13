@@ -94,7 +94,7 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
       RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY.toString,
       RecordStatusEnum.FAILED_PENDING_RETRY.toString,
       RecordStatusEnum.FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY.toString): _*
-    )).toFuture()
+    )).limit(appConfig.numberOfNotificationsToSendInBatch).toFuture()
   }
 
   def getNotificationsInState(state: RecordStatusEnum.Value): Future[Seq[SDESNotificationRecord]] = {
