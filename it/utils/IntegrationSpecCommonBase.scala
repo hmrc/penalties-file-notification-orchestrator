@@ -63,7 +63,8 @@ trait IntegrationSpecCommonBase extends AnyWordSpec with GuiceOneServerPerSuite 
         "microservice.services.penalties-stub.host" -> stubHost,
         "microservice.services.penalties-stub.port" -> stubPort,
         "microservice.services.sdes.host" -> stubHost,
-        "microservice.services.penalties-stub.port" -> stubPort
+        "microservice.services.penalties-stub.port" -> stubPort,
+        "notifications.numberOfNotificationsToSendInBatch" -> 10
       )
     )
     .build()

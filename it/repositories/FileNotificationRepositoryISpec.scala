@@ -99,6 +99,24 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       result shouldBe Seq(notificationRecordPendingRetry, notificationRecord6, notificationRecordNotProcessedPendingRetry, notificationRecordInPending, notificationRecord2)
     }
 
+    "limit the number of notifications to send to SDES to 10 (configurable)" in new Setup {
+      val notificationRecordInPending: SDESNotificationRecord = SDESNotificationRecord(
+        reference = "ref",
+        status = RecordStatusEnum.PENDING,
+        numberOfAttempts = 1,
+        createdAt = LocalDateTime.of(2020, 1, 1, 1, 1).toInstant(ZoneOffset.UTC),
+        updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2).toInstant(ZoneOffset.UTC),
+        nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3).toInstant(ZoneOffset.UTC),
+        notification = sampleNotification
+      )
+      val notifications: Seq[SDESNotificationRecord] = (1 to 11).map(idx => notificationRecordInPending.copy(reference = s"ref$idx"))
+
+      await(repository.insertFileNotifications(notifications))
+      val result = await(repository.getPendingNotifications())
+      result.size shouldBe 10
+      result shouldBe notifications.dropRight(1)
+    }
+
     def onlyStatusTest(status: RecordStatusEnum.Value): Unit = {
       s"get all the notifications in $status status (if they are the only records)" in new Setup {
         val notificationRecordInPending: SDESNotificationRecord = SDESNotificationRecord(
