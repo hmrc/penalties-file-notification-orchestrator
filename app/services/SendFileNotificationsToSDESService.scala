@@ -16,6 +16,7 @@
 
 package services
 
+import config.AppConfig
 import connectors.SDESConnector
 import models.FailedJobResponses.{FailedToProcessNotifications, UnknownProcessingException}
 import models.notification.RecordStatusEnum.PERMANENT_FAILURE
@@ -42,7 +43,8 @@ class SendFileNotificationsToSDESService @Inject()(
                                                     fileNotificationRepository: FileNotificationRepository,
                                                     sdesConnector: SDESConnector,
                                                     timeMachine: TimeMachine,
-                                                    config: Configuration
+                                                    config: Configuration,
+                                                    appConfig: AppConfig
                                                   )(implicit ec: ExecutionContext) extends ScheduledService[Either[ScheduleStatus.JobFailed, String]] {
 
   val jobName = "SendFileNotificationsToSDESJob"
@@ -65,7 +67,9 @@ class SendFileNotificationsToSDESService @Inject()(
           val notificationCandidates = notifications.filter(notification =>
             LocalDateTime.ofInstant(notification.nextAttemptAt, ZoneId.of("UTC")).isEqual(timeMachine.dateTimeNow) || notification.nextAttemptAt.isBefore(timeMachine.now))
           logger.info(s"[SendFileNotificationsToSDESService][invoke] - Amount of notifications: ${notificationCandidates.size} after filtering")
-          Future.sequence(notificationCandidates.map {
+          val reducedNotifications = notificationCandidates.take(appConfig.numberOfNotificationsToSendInBatch)
+          logDifferenceInLimitedNotificationsVersusFilteredNotifications(reducedNotifications, notificationCandidates)
+          Future.sequence(reducedNotifications.map {
             notificationWrapper => {
               if (notificationWrapper.numberOfAttempts >= retryThreshold) {
                 PagerDutyHelper.log("invoke", NOTIFICATION_SET_TO_PERMANENT_FAILURE)
@@ -158,5 +162,14 @@ class SendFileNotificationsToSDESService @Inject()(
 
   def setRecordToPermanentFailure(record: SDESNotificationRecord): SDESNotificationRecord = {
     record.copy(status = RecordStatusEnum.PERMANENT_FAILURE, updatedAt = timeMachine.now)
+  }
+
+  private def logDifferenceInLimitedNotificationsVersusFilteredNotifications(numberOfNotificationsThatHaveBeenLimited: Seq[SDESNotificationRecord],
+                                                                           numberOfFilteredNotificationsThatWereReadyToSend: Seq[SDESNotificationRecord]): Unit = {
+    val limit = appConfig.numberOfNotificationsToSendInBatch
+    val startOfLog = "[SendFileNotificationsToSDESService][logDifferenceInLimitedNotificationsVersusFilteredNotifications] - "
+    if(numberOfNotificationsThatHaveBeenLimited.size != numberOfFilteredNotificationsThatWereReadyToSend.size) {
+      logger.info(s"$startOfLog Number of notifications exceeded limit (of $limit). Number of notifications that were ready to send was: ${numberOfFilteredNotificationsThatWereReadyToSend.size}. Only $limit will be sent.")
+    }
   }
 }
