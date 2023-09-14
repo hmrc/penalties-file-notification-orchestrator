@@ -42,6 +42,4 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
   lazy val minutesUntilNextAttemptOnCallbackFailure: Int = config.get[Int]("notifications.minutesUntilRetryOnCallbackFailure")
 
   lazy val numberOfMinutesToWaitUntilNotificationRetried: Int = config.get[Int]("notifications.numberOfMinutesToWaitUntilNotificationRetried")
-
-  lazy val numberOfNotificationsToSendInBatch: Int = config.get[Int]("notifications.numberOfNotificationsToSendInBatch")
 }
