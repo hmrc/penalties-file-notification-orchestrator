@@ -17,6 +17,7 @@
 package services
 
 import base.SpecBase
+import config.AppConfig
 import connectors.SDESConnector
 import models.FailedJobResponses.{FailedToProcessNotifications, UnknownProcessingException}
 import models.notification._
@@ -42,6 +43,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
   val mockLockRepository: MongoLockRepository = mock[MongoLockRepository]
   val mockSDESConnector: SDESConnector = mock[SDESConnector]
   val mockConfig: Configuration = mock[Configuration]
+  val mockAppConfig: AppConfig = mock[AppConfig]
   val mockTimeMachine: TimeMachine = mock[TimeMachine]
   val mockFileNotificationRepository: FileNotificationRepository = mock[FileNotificationRepository]
   val jobName = "SendFileNotificationsToSDESJob"
@@ -82,13 +84,14 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
   )
 
   class Setup(withMongoLockStubs: Boolean = true) {
-    reset(mockLockRepository, mockConfig, mockSDESConnector, mockFileNotificationRepository, mockTimeMachine, mockSDESConnector)
-    val service = new SendFileNotificationsToSDESService(mockLockRepository, mockFileNotificationRepository, mockSDESConnector, mockTimeMachine, mockConfig)
+    reset(mockLockRepository, mockConfig, mockSDESConnector, mockFileNotificationRepository, mockTimeMachine, mockSDESConnector, mockAppConfig)
+    val service = new SendFileNotificationsToSDESService(mockLockRepository, mockFileNotificationRepository, mockSDESConnector, mockTimeMachine, mockConfig, mockAppConfig)
     when(mockConfig.get[Int](ArgumentMatchers.eq("notifications.retryThreshold"))(ArgumentMatchers.any())).thenReturn(5)
     when(mockConfig.get[Int](ArgumentMatchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(ArgumentMatchers.any()))
       .thenReturn(mongoLockTimeout)
     when(mockTimeMachine.dateTimeNow).thenReturn(LocalDateTime.of(2022, 1, 1, 0, 0, 0))
     when(mockTimeMachine.now).thenReturn(mockDateTime)
+    when(mockAppConfig.numberOfNotificationsToSendInBatch).thenReturn(10)
     if (withMongoLockStubs) {
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
         .thenReturn(Future.successful(true))
@@ -117,6 +120,28 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
       result.toOption.get shouldBe "Processed all notifications"
       verify(mockSDESConnector, times(2)).sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any())
       verify(mockFileNotificationRepository, times(2)).updateFileNotification(ArgumentMatchers.any())
+    }
+
+    "process the notification and return Right if they all succeed - limit notifications to 10 " +
+      "(if more are able to be sent - to prevent overloading downstream)" in new Setup {
+      val notifications: Seq[SDESNotificationRecord] = (1 to 15).map(idx => notificationRecord.copy(reference = s"ref$idx"))
+      when(mockFileNotificationRepository.getPendingNotifications()).thenReturn(Future.successful(notifications))
+      when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any())).thenReturn(Future.successful(
+        notificationRecord.copy(status = RecordStatusEnum.SENT, updatedAt = LocalDateTime.now().toInstant(ZoneOffset.UTC))
+      ))
+      when(mockSDESConnector.sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any()))
+        .thenReturn(Future.successful(HttpResponse(NO_CONTENT, "")))
+      withCaptureOfLoggingFrom(logger) {
+        logs => {
+          val result = await(service.invoke)
+          result.isRight shouldBe true
+          result.toOption.get shouldBe "Processed all notifications"
+          verify(mockSDESConnector, times(10)).sendNotificationToSDES(ArgumentMatchers.any())(ArgumentMatchers.any())
+          verify(mockFileNotificationRepository, times(10)).updateFileNotification(ArgumentMatchers.any())
+          logs.exists(_.getMessage == "[SendFileNotificationsToSDESService][logDifferenceInLimitedNotificationsVersusFilteredNotifications] - " +
+            "Number of notifications exceeded limit (of 10). Number of notifications that were ready to send was: 15. Only 10 will be sent.")
+        }
+      }
     }
 
     "process the notifications and return Left if some fail" in new Setup {
