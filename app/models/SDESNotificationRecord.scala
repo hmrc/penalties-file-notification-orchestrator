@@ -58,9 +58,9 @@ object SDESNotificationRecord extends MongoJavatimeFormats {
   }
 
   def decrypt(record: SDESNotificationRecord)(implicit decrypter: Decrypter): SDESNotificationRecord = {
-    val encryptedFile = decryptFile(record.notification.file)
+    val decryptedFile = decryptFile(record.notification.file)
     record.copy(
-      notification = record.notification.copy(file = encryptedFile)
+      notification = record.notification.copy(file = decryptedFile)
     )
   }
 }
