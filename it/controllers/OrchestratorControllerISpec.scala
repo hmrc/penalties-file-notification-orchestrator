@@ -77,7 +77,7 @@ class OrchestratorControllerISpec extends IntegrationSpecCommonBase with LogCapt
         jsonToReceive
       ))
       result.status shouldBe OK
-      val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().toFuture())
+      val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().map(SDESNotificationRecord.decrypt(_)).toFuture())
       recordsInMongoAfterInsertion.size shouldBe 1
       Json.toJson(Seq(recordsInMongoAfterInsertion.head.notification)) shouldBe jsonToReceive
     }

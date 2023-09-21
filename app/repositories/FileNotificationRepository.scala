@@ -18,6 +18,7 @@ package repositories
 
 import com.mongodb.client.model.Updates.{combine, set}
 import config.AppConfig
+import crypto.CryptoProvider
 import models.SDESNotificationRecord
 import models.notification.RecordStatusEnum
 import models.notification.RecordStatusEnum.{FAILED_PENDING_RETRY, FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY, NOT_PROCESSED_PENDING_RETRY}
@@ -26,6 +27,7 @@ import org.mongodb.scala.model.Indexes.ascending
 import org.mongodb.scala.model.Updates.inc
 import org.mongodb.scala.model.{IndexModel, IndexOptions}
 import play.api.libs.json.{Format, Json, OFormat}
+import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
@@ -42,7 +44,7 @@ import scala.concurrent.{ExecutionContext, Future}
 @Singleton
 class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
                                            timeMachine: TimeMachine,
-                                           appConfig: AppConfig)(implicit ec: ExecutionContext)
+                                           appConfig: AppConfig)(implicit ec: ExecutionContext, cryptoProvider: CryptoProvider)
   extends PlayMongoRepository[SDESNotificationRecord](
     collectionName = "sdes-file-notifications",
     mongoComponent = mongoComponent,
@@ -53,11 +55,13 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
       IndexModel(ascending("createdAt"), IndexOptions().expireAfter(appConfig.notificationTtl, TimeUnit.DAYS))
     )) with MongoJavatimeFormats {
 
+  private implicit val crypto: Encrypter with Decrypter = cryptoProvider.getCrypto
   implicit val dateFormat: Format[Instant] = instantFormat
   implicit val mongoFormats: OFormat[SDESNotificationRecord] = Json.format[SDESNotificationRecord]
 
   def insertFileNotifications(records: Seq[SDESNotificationRecord]): Future[Boolean] = {
-    collection.insertMany(records).toFuture().map(_.wasAcknowledged())
+    val encryptedFileNotifications = records.map(record => SDESNotificationRecord.encrypt(record))
+    collection.insertMany(encryptedFileNotifications).toFuture().map(_.wasAcknowledged())
       .recover {
         case e =>
           PagerDutyHelper.log("insertFileNotifications", FAILED_TO_INSERT_SDES_NOTIFICATION)
@@ -67,12 +71,13 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
   }
 
   def updateFileNotification(record: SDESNotificationRecord): Future[SDESNotificationRecord] = {
+    val encryptedFileNotifications = SDESNotificationRecord.encrypt(record)
     logger.info(s"[FileNotificationRepository][updateFileNotification] - Updating record ${record.reference} in Mongo")
-    collection.findOneAndUpdate(equal("reference", record.reference), combine(
-      set("nextAttemptAt", Codecs.toBson(record.nextAttemptAt)),
-      set("status", record.status.toString),
-      set("numberOfAttempts", record.numberOfAttempts),
-      set("updatedAt", Codecs.toBson(record.updatedAt))
+    collection.findOneAndUpdate(equal("reference", encryptedFileNotifications.reference), combine(
+      set("nextAttemptAt", Codecs.toBson(encryptedFileNotifications.nextAttemptAt)),
+      set("status", encryptedFileNotifications.status.toString),
+      set("numberOfAttempts", encryptedFileNotifications.numberOfAttempts),
+      set("updatedAt", Codecs.toBson(encryptedFileNotifications.updatedAt))
     )).toFuture()
   }
 
@@ -94,13 +99,13 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
       RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY.toString,
       RecordStatusEnum.FAILED_PENDING_RETRY.toString,
       RecordStatusEnum.FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY.toString): _*
-    )).toFuture()
+    )).map(SDESNotificationRecord.decrypt(_)).toFuture()
   }
 
   def getNotificationsInState(state: RecordStatusEnum.Value): Future[Seq[SDESNotificationRecord]] = {
     collection.find(equal("status",
       state.toString
-    )).toFuture()
+    )).map(SDESNotificationRecord.decrypt(_)).toFuture()
   }
 
   def countRecordsByStatus(status: RecordStatusEnum.Value): Future[Long] = {

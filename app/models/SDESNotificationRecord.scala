@@ -16,8 +16,9 @@
 
 package models
 
-import models.notification.{RecordStatusEnum, SDESNotification}
+import models.notification.{RecordStatusEnum, SDESNotification, SDESNotificationFile}
 import play.api.libs.json._
+import uk.gov.hmrc.crypto.{Crypted, Decrypter, Encrypter, PlainText}
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 
 import java.time.Instant
@@ -34,5 +35,33 @@ case class SDESNotificationRecord(reference: String,
 object SDESNotificationRecord extends MongoJavatimeFormats {
   implicit val dateFormat: Format[Instant] = instantFormat
   implicit val mongoFormats: OFormat[SDESNotificationRecord] = Json.format[SDESNotificationRecord]
+
+  private def encryptFile(file: SDESNotificationFile)(implicit encrypter: Encrypter): SDESNotificationFile = {
+    file.copy(
+      name = encrypter.encrypt(PlainText(file.name)).value,
+      location = encrypter.encrypt(PlainText(file.location)).value
+    )
+  }
+
+  private def decryptFile(file: SDESNotificationFile)(implicit decrypter: Decrypter): SDESNotificationFile = {
+    file.copy(
+      name = decrypter.decrypt(Crypted(file.name)).value,
+      location = decrypter.decrypt(Crypted(file.location)).value
+    )
+  }
+
+  def encrypt(record: SDESNotificationRecord)(implicit encrypter: Encrypter): SDESNotificationRecord = {
+    val encryptedFile = encryptFile(record.notification.file)
+    record.copy(
+      notification = record.notification.copy(file = encryptedFile)
+    )
+  }
+
+  def decrypt(record: SDESNotificationRecord)(implicit decrypter: Decrypter): SDESNotificationRecord = {
+    val encryptedFile = decryptFile(record.notification.file)
+    record.copy(
+      notification = record.notification.copy(file = encryptedFile)
+    )
+  }
 }
 
