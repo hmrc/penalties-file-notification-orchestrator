@@ -32,6 +32,7 @@ case class SDESCallback(
                          dateTime: Option[LocalDateTime] = None,
                          properties: Option[Seq[Properties]]
                        )
+
 case class Properties(name: String, value: String)
 
 object SDESCallback {

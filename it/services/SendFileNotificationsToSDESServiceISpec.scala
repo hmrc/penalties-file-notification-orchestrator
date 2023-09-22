@@ -92,7 +92,7 @@ class SendFileNotificationsToSDESServiceISpec extends IntegrationSpecCommonBase 
       val result = await(service.invoke)
       result.isRight shouldBe true
       result.toOption.get shouldBe "Processed all notifications"
-      val notificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find(Document()).toFuture())
+      val notificationsInRepo: Seq[SDESNotificationRecord] = await(notificationRepo.collection.find().map(SDESNotificationRecord.decrypt(_)).toFuture())
       notificationsInRepo.exists(_.equals(notificationRecord.copy(reference = "ref2", nextAttemptAt = dateTimeOfNow.plus(2, MINUTES)))) shouldBe true
       notificationsInRepo.find(_.reference == "ref1").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true
       notificationsInRepo.find(_.reference == "ref").get.updatedAt.isAfter(dateTimeOfNow) shouldBe true

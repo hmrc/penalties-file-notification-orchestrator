@@ -17,6 +17,7 @@
 package utils
 
 import com.codahale.metrics.SharedMetricRegistries
+import crypto.CryptoProvider
 import helpers.WiremockHelper
 import models.notification._
 import org.scalatest.wordspec.AnyWordSpec
@@ -25,6 +26,7 @@ import org.scalatestplus.play.guice.GuiceOneServerPerSuite
 import play.api.inject.Injector
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.ws.{WSClient, WSRequest}
+import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 trait IntegrationSpecCommonBase extends AnyWordSpec with GuiceOneServerPerSuite with
   BeforeAndAfterAll with BeforeAndAfterEach with TestSuite with WiremockHelper {
@@ -63,7 +65,8 @@ trait IntegrationSpecCommonBase extends AnyWordSpec with GuiceOneServerPerSuite 
         "microservice.services.penalties-stub.host" -> stubHost,
         "microservice.services.penalties-stub.port" -> stubPort,
         "microservice.services.sdes.host" -> stubHost,
-        "microservice.services.penalties-stub.port" -> stubPort
+        "microservice.services.penalties-stub.port" -> stubPort,
+        "mongodb.encryption.enabled" -> true
       )
     )
     .build()
@@ -89,4 +92,6 @@ trait IntegrationSpecCommonBase extends AnyWordSpec with GuiceOneServerPerSuite 
     ),
     audit = SDESAudit("123456789-abcdefgh-987654321")
   )
+
+  implicit val crypto: Encrypter with Decrypter = injector.instanceOf[CryptoProvider].getCrypto
 }

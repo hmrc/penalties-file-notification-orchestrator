@@ -61,7 +61,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
     "insert a single notification received from the backend" in new Setup{
       val result: Boolean = await(repository.insertFileNotifications(Seq(notificationRecord)))
       result shouldBe true
-      val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().toFuture())
+      val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().map(SDESNotificationRecord.decrypt(_)).toFuture())
       recordsInMongoAfterInsertion.size shouldBe 1
       recordsInMongoAfterInsertion.head shouldBe notificationRecord
     }
@@ -69,7 +69,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
     "insert multiple notifications received from the backend" in new Setup {
       val result: Boolean = await(repository.insertFileNotifications(Seq(notificationRecord, notificationRecord2)))
       result shouldBe true
-      val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().toFuture())
+      val recordsInMongoAfterInsertion: Seq[SDESNotificationRecord] = await(repository.collection.find().map(SDESNotificationRecord.decrypt(_)).toFuture())
       recordsInMongoAfterInsertion.size shouldBe 2
       recordsInMongoAfterInsertion.head shouldBe notificationRecord
       recordsInMongoAfterInsertion.last shouldBe notificationRecord2
@@ -142,7 +142,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       await(repository.getPendingNotifications()).size shouldBe 1
       await(repository.updateFileNotification(updatedNotification))
       await(repository.getPendingNotifications()).size shouldBe 0
-      await(repository.collection.find(Document()).toFuture()).head shouldBe updatedNotification
+      await(repository.collection.find().map(SDESNotificationRecord.decrypt(_)).toFuture()).head shouldBe updatedNotification
     }
   }
 
