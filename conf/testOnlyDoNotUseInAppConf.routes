@@ -12,3 +12,4 @@
 # Add all the application routes to the prod.routes file
 ->         /                          prod.Routes
 GET        /penalties-file-notification-orchestrator/test-only/bearer-token    controllers.testOnly.BearerTokenController.getBearerToken(serviceName: String)
+GET        /penalties-file-notification-orchestrator/test-only/number-of-records   controllers.testOnly.MongoQueryController.getNumberOfRecords
