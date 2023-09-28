@@ -112,7 +112,7 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
     collection.countDocuments(equal("status", status.toString)).toFuture()
   }
 
-  def counterAllRecords():Future[Long] = {
+  def countAllRecords():Future[Long] = {
     collection.countDocuments().toFuture()
   }
 }

@@ -10,7 +10,7 @@ import repositories.FileNotificationRepository
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class MongoQueryControllerISpec extends SpecBase {
+class MongoQueryControllerSpec extends SpecBase {
   val mockRepo: FileNotificationRepository = mock[FileNotificationRepository]
   implicit val ec: ExecutionContext = injector.instanceOf[ExecutionContext]
 
@@ -21,7 +21,7 @@ class MongoQueryControllerISpec extends SpecBase {
 
   "getNumberOfRecords" should {
     s"return OK (${Status.OK}) with correct number of records" in new Setup {
-      when(mockRepo.counterAllRecords()).thenReturn(Future.successful(5))
+      when(mockRepo.countAllRecords()).thenReturn(Future.successful(5))
       val result: Future[Result] = controller.getNumberOfRecords()(fakeRequest)
       status(result) shouldBe OK
       contentAsString(result) shouldBe "5"

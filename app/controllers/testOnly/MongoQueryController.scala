@@ -17,18 +17,17 @@
 package controllers.testOnly
 
 import javax.inject.Inject
-import models.notification.RecordStatusEnum
-import play.api.libs.json.{JsString, Json}
 import play.api.mvc.{Action, AnyContent, ControllerComponents}
 import repositories.FileNotificationRepository
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import scala.concurrent.ExecutionContext
 
-class MongoQueryController @Inject()(cc: ControllerComponents, repository: FileNotificationRepository)(implicit val ec: ExecutionContext) extends BackendController(cc){
+class MongoQueryController @Inject()(cc: ControllerComponents,
+                                     repository: FileNotificationRepository)(implicit val ec: ExecutionContext) extends BackendController(cc) {
 
   def getNumberOfRecords: Action[AnyContent] = Action.async {
-    repository.counterAllRecords().map {
+    repository.countAllRecords().map {
         numberOfRecords => {
           Ok(s"$numberOfRecords")
         }
