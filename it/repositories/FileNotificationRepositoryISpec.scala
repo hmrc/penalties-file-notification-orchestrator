@@ -251,4 +251,25 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       result.exists(_.reference.equals("ref4")) shouldBe true
     }
   }
+
+  "countAllRecords" should {
+    "return all records in repository" in new Setup {
+      val notificationRecordInPending: SDESNotificationRecord = SDESNotificationRecord(
+        reference = "ref",
+        status = RecordStatusEnum.PENDING,
+        numberOfAttempts = 1,
+        createdAt = LocalDateTime.of(2020,1,1,1,1).toInstant(ZoneOffset.UTC),
+        updatedAt = LocalDateTime.of(2020,2,2,2,2).toInstant(ZoneOffset.UTC),
+        nextAttemptAt = LocalDateTime.of(2020,3,3,3,3).toInstant(ZoneOffset.UTC),
+        notification = sampleNotification
+      )
+
+      val notificationRecordInSent: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref1",
+        status = RecordStatusEnum.SENT)
+      val notificationRecordInFailure: SDESNotificationRecord = notificationRecordInPending.copy(reference = "ref2",
+        status = RecordStatusEnum.PERMANENT_FAILURE)
+      await(repository.insertFileNotifications(Seq(notificationRecordInPending, notificationRecordInSent, notificationRecordInFailure)))
+      await(repository.countAllRecords()) shouldBe 3
+    }
+  }
 }
