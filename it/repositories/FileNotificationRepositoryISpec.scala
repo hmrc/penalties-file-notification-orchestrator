@@ -170,7 +170,7 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
   }
 
   "updateFileNotification(reference, updatedStatus)" should {
-    "find the existing record and update the fields (not incrementing retries when successful)" in new Setup {
+    "find the existing record and update the fields (not incrementing retries when successful) when not in FILE_PROCESSED_IN_SDES state" in new Setup {
       val notificationRecordInSent: SDESNotificationRecord = SDESNotificationRecord(
         reference = "ref",
         status = RecordStatusEnum.SENT,
@@ -189,6 +189,27 @@ class FileNotificationRepositoryISpec extends IntegrationSpecCommonBase {
       updatedNotification.createdAt shouldBe notificationRecordInSent.createdAt
       updatedNotification.updatedAt.isAfter(notificationRecordInSent.updatedAt) shouldBe true
       LocalDateTime.ofInstant(updatedNotification.nextAttemptAt, ZoneId.of("UTC")).withSecond(0).withNano(0) shouldBe LocalDateTime.now(ZoneId.of("UTC")).withSecond(0).withNano(0)
+    }
+
+    "find the existing record and not update the fields when in FILE_PROCESSED_IN_SDES state" in new Setup {
+      val notificationRecordInProcessed: SDESNotificationRecord = SDESNotificationRecord(
+        reference = "ref",
+        status = RecordStatusEnum.FILE_PROCESSED_IN_SDES,
+        numberOfAttempts = 1,
+        createdAt = LocalDateTime.of(2020, 1, 1, 1, 1).toInstant(ZoneOffset.UTC),
+        updatedAt = LocalDateTime.of(2020, 2, 2, 2, 2).toInstant(ZoneOffset.UTC),
+        nextAttemptAt = LocalDateTime.of(2020, 3, 3, 3, 3).toInstant(ZoneOffset.UTC),
+        notification = sampleNotification
+      )
+      await(repository.insertFileNotifications(Seq(notificationRecordInProcessed)))
+      await(repository.updateFileNotification("ref", RecordStatusEnum.FAILED_PENDING_RETRY))
+
+      val updatedNotification: SDESNotificationRecord = await(repository.collection.find().toFuture()).head
+      updatedNotification.reference shouldBe notificationRecordInProcessed.reference
+      updatedNotification.status shouldBe RecordStatusEnum.FILE_PROCESSED_IN_SDES
+      updatedNotification.numberOfAttempts shouldBe 1
+      updatedNotification.createdAt shouldBe notificationRecordInProcessed.createdAt
+      updatedNotification.updatedAt.isAfter(notificationRecordInProcessed.updatedAt) shouldBe false
     }
 
     "find the existing record and update the fields (incrementing retries when failed - NOT_PROCESSED_PENDING_RETRY)" in new Setup {

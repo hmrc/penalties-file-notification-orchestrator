@@ -21,7 +21,7 @@ import config.AppConfig
 import crypto.CryptoProvider
 import models.SDESNotificationRecord
 import models.notification.RecordStatusEnum
-import models.notification.RecordStatusEnum.{FAILED_PENDING_RETRY, FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY, NOT_PROCESSED_PENDING_RETRY}
+import models.notification.RecordStatusEnum._
 import org.mongodb.scala.model.Filters.{equal, in}
 import org.mongodb.scala.model.Indexes.ascending
 import org.mongodb.scala.model.Updates.inc
@@ -82,15 +82,23 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
   }
 
   def updateFileNotification(reference: String, updatedStatus: RecordStatusEnum.Value): Future[SDESNotificationRecord] = {
-    logger.info(s"[FileNotificationRepository][updateFileNotification] - Updating record $reference in Mongo")
-    collection.findOneAndUpdate(equal("reference", reference), combine(
-      if(updatedStatus == NOT_PROCESSED_PENDING_RETRY || updatedStatus == FAILED_PENDING_RETRY || updatedStatus == FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY)
-        set("nextAttemptAt", Codecs.toBson(timeMachine.now.plus(appConfig.minutesUntilNextAttemptOnCallbackFailure, MINUTES)))
-      else set("nextAttemptAt", Codecs.toBson(timeMachine.now)),
-      set("status", updatedStatus.toString),
-      inc("numberOfAttempts", if(updatedStatus == NOT_PROCESSED_PENDING_RETRY || updatedStatus == FAILED_PENDING_RETRY || updatedStatus == FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY) 1 else 0),
-      set("updatedAt", Codecs.toBson(timeMachine.now))
-    )).toFuture()
+    val result = collection.find(equal("reference", reference)).toFuture().map(notification => notification)
+    result.flatMap { records =>
+      if(records.nonEmpty && records.head.status.equals(FILE_PROCESSED_IN_SDES)) {
+        logger.info(s"[FileNotificationRepository][updateFileNotification] - Record $reference already processed skipping update")
+        Future(records.head)
+      } else {
+        logger.info(s"[FileNotificationRepository][updateFileNotification] - Updating record $reference in Mongo")
+        collection.findOneAndUpdate(equal("reference", reference), combine(
+          if (updatedStatus == NOT_PROCESSED_PENDING_RETRY || updatedStatus == FAILED_PENDING_RETRY || updatedStatus == FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY)
+            set("nextAttemptAt", Codecs.toBson(timeMachine.now.plus(appConfig.minutesUntilNextAttemptOnCallbackFailure, MINUTES)))
+          else set("nextAttemptAt", Codecs.toBson(timeMachine.now)),
+          set("status", updatedStatus.toString),
+          inc("numberOfAttempts", if (updatedStatus == NOT_PROCESSED_PENDING_RETRY || updatedStatus == FAILED_PENDING_RETRY || updatedStatus == FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY) 1 else 0),
+          set("updatedAt", Codecs.toBson(timeMachine.now))
+        )).toFuture()
+      }
+    }
   }
 
   def getPendingNotifications(): Future[Seq[SDESNotificationRecord]] = {
@@ -112,7 +120,7 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
     collection.countDocuments(equal("status", status.toString)).toFuture()
   }
 
-  def countAllRecords():Future[Long] = {
+  def countAllRecords(): Future[Long] = {
     collection.countDocuments().toFuture()
   }
 }
