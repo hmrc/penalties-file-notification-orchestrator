@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package controllers.testOnly
+package test.controllers.testOnly
 
+import controllers.testOnly.MongoQueryController
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.result.DeleteResult
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper

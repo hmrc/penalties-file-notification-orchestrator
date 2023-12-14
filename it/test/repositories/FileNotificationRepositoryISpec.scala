@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package repositories
+package test.repositories
 
 import models.SDESNotificationRecord
 import models.notification._
@@ -22,6 +22,7 @@ import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.result.DeleteResult
 import org.scalatest.matchers.should.Matchers._
 import play.api.test.Helpers._
+import repositories.FileNotificationRepository
 import services.NotificationMongoService
 import utils.IntegrationSpecCommonBase
 

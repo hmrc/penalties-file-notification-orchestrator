@@ -1,6 +1,5 @@
 import scoverage.ScoverageKeys
 import uk.gov.hmrc.DefaultBuildSettings.integrationTestSettings
-import uk.gov.hmrc.sbtdistributables.SbtDistributablesPlugin.publishingSettings
 
 val appName = "penalties-file-notification-orchestrator"
 
@@ -11,17 +10,8 @@ lazy val microservice = Project(appName, file("."))
   .settings(
     majorVersion                     := 0,
     PlayKeys.playDefaultPort         := 9184,
-    scalaVersion                     := "2.13.8",
-    libraryDependencies              ++= AppDependencies.compile ++ AppDependencies.test,
-    // ***************
-    // Use the silencer plugin to suppress warnings
-    scalacOptions += "-P:silencer:pathFilters=routes",
-    libraryDependencies ++= Seq(
-      compilerPlugin("com.github.ghik" % "silencer-plugin" % silencerVersion cross CrossVersion.full),
-      "com.github.ghik" % "silencer-lib" % silencerVersion % Provided cross CrossVersion.full
-    )
-    // ***************
-  )
+    scalaVersion                     := "2.13.12",
+    libraryDependencies              ++= AppDependencies.compile ++ AppDependencies.test)
   .configs(IntegrationTest)
   .settings(integrationTestSettings(): _*)
   .settings(resolvers += Resolver.jcenterRepo)
@@ -32,3 +22,5 @@ lazy val microservice = Project(appName, file("."))
     ScoverageKeys.coverageMinimumStmtTotal := 90,
     ScoverageKeys.coverageFailOnMinimum := false,
     ScoverageKeys.coverageHighlighting := true)
+  .settings(scalacOptions += "-Wconf:cat=unused-imports&src=routes/.*:s")
+

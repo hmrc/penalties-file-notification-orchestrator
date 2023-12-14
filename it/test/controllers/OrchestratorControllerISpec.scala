@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package controllers
+package test.controllers
 
+import controllers.OrchestratorController
 import models.SDESNotificationRecord
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.result.DeleteResult
