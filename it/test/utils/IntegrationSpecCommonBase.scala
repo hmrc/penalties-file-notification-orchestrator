@@ -18,7 +18,6 @@ package utils
 
 import com.codahale.metrics.SharedMetricRegistries
 import crypto.CryptoProvider
-import helpers.WiremockHelper
 import models.notification._
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, TestSuite}
@@ -26,6 +25,7 @@ import org.scalatestplus.play.guice.GuiceOneServerPerSuite
 import play.api.inject.Injector
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.ws.{WSClient, WSRequest}
+import test.helpers.WiremockHelper
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 trait IntegrationSpecCommonBase extends AnyWordSpec with GuiceOneServerPerSuite with

@@ -16,7 +16,7 @@
 
 package scheduler
 
-import akka.actor.{Actor, ActorLogging, Props}
+import org.apache.pekko.actor.{Actor, ActorLogging, Props}
 import scheduler.SchedulingActor._
 import services.{HandleStuckNotificationsService, MonitoringJobService, SendFileNotificationsToSDESService}
 import utils.Logger.logger

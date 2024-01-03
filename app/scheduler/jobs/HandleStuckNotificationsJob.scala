@@ -16,7 +16,7 @@
 
 package scheduler.jobs
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import play.api.Configuration
 import play.api.inject.ApplicationLifecycle
 import scheduler.ScheduledJob

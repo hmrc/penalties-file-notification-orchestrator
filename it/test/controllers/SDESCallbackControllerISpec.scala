@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package controllers
+package test.controllers
 
+import controllers.SDESCallbackController
 import org.scalatest.matchers.should.Matchers._
 import play.api.http.Status.{BAD_REQUEST, NO_CONTENT}
 import play.api.libs.json.{JsValue, Json}

@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package services
+package test.services
 
-import helpers.SDESStub
 import models.FailedJobResponses.FailedToProcessNotifications
 import models.SDESNotificationRecord
 import models.notification._
@@ -24,6 +23,8 @@ import org.mongodb.scala.Document
 import org.scalatest.matchers.should.Matchers._
 import play.api.test.Helpers._
 import repositories.FileNotificationRepository
+import services.SendFileNotificationsToSDESService
+import test.helpers.SDESStub
 import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys.NOTIFICATION_SET_TO_PERMANENT_FAILURE
