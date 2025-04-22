@@ -17,7 +17,7 @@
 package services
 
 import base.SpecBase
-import models.FailedJobResponses.FailedToProcessNotifications
+import models.FailedJobResponses.{FailedToProcessNotifications, UnknownProcessingException}
 import models.notification._
 import models.{MongoLockResponses, SDESNotificationRecord}
 import org.mockito.ArgumentMatchers
@@ -108,7 +108,7 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any())).thenReturn(Future.successful(
         notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now().toInstant(ZoneOffset.UTC))
       ))
-      val result = await(service.invoke)
+      val result: Either[ScheduleStatus.JobFailed, String] = await(service.invoke)
       result.isRight shouldBe true
       result.getOrElse("fail") shouldBe "Processed all notifications"
       verify(mockFileNotificationRepository, times(1)).updateFileNotification(ArgumentMatchers.eq("ref2"), ArgumentMatchers.eq(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY))
@@ -124,7 +124,7 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
         logs => {
           val result = await(service.invoke)
           result.isLeft shouldBe true
-          result.left.getOrElse("fail") shouldBe FailedToProcessNotifications
+          result.left.getOrElse(UnknownProcessingException) shouldBe FailedToProcessNotifications
           eventually {
             logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION.toString)) shouldBe true
             logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION.toString)) shouldBe true
@@ -143,7 +143,7 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
         logs => {
           val result = await(service.invoke)
           result.isLeft shouldBe true
-          result.left.getOrElse("fail") shouldBe FailedToProcessNotifications
+          result.left.getOrElse(UnknownProcessingException) shouldBe FailedToProcessNotifications
           eventually {
             logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION.toString)) shouldBe true
             logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION.toString)) shouldBe true
