@@ -32,12 +32,12 @@ import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys
 import utils.{LogCapturing, TimeMachine}
-
 import java.time.temporal.ChronoUnit.{HOURS, MINUTES}
 import java.time.{Instant, LocalDateTime, ZoneOffset}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, DurationInt}
+import uk.gov.hmrc.mongo.lock.{Lock}
 
 class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing {
   val mockLockRepository: MongoLockRepository = mock[MongoLockRepository]
@@ -51,6 +51,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
   val mongoLockId: String = s"schedules.$jobName"
   val mongoLockTimeout: Int = 123
   val releaseDuration: Duration = mongoLockTimeout.seconds
+  val mockLock = Lock(mongoLockId, "owner", Instant.now(), Instant.now().plusSeconds(60))
 
   val mockDateTime: Instant = LocalDateTime.of(2022, 1, 1, 0, 0, 0).toInstant(ZoneOffset.UTC)
   val notification: SDESNotification = SDESNotification(
@@ -94,9 +95,9 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
     when(mockAppConfig.numberOfNotificationsToSendInBatch).thenReturn(10)
     if (withMongoLockStubs) {
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
-        .thenReturn(Future.successful(true))
+        .thenReturn(Future.successful(Some(mockLock)))
       when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(None))
     }
   }
 
@@ -334,7 +335,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
     s"return $Right when lockRepository is able to lock and unlock successfully" in new Setup {
       val expectingResult = Future.successful(Right(""))
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
-        .thenReturn(Future.successful(true))
+        .thenReturn(Future.successful(Some(mockLock)))
       when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
         .thenReturn(Future.successful(()))
       await(service.tryLock(expectingResult)) shouldBe Right("")
@@ -345,7 +346,7 @@ class SendFileNotificationsToSDESServiceSpec extends SpecBase with LogCapturing 
     s"return a $Right ${Seq.empty} if lock returns false" in new Setup {
       val expectingResult = Future.successful(Right(""))
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
-        .thenReturn(Future.successful(false))
+        .thenReturn(Future.successful(None))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Right(s"$jobName - JobAlreadyRunning")
         capturedLogEvents.exists(_.getMessage == s"[$jobName] Locked because it might be running on another instance") shouldBe true

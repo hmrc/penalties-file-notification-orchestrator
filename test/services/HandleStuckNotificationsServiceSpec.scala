@@ -30,7 +30,7 @@ import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys
 import utils.{LogCapturing, TimeMachine}
-
+import uk.gov.hmrc.mongo.lock.{Lock}
 import java.time.temporal.ChronoUnit.{HOURS, MINUTES}
 import java.time.{Instant, LocalDateTime, ZoneOffset}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -38,15 +38,17 @@ import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, DurationInt}
 
 class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
-  val mockLockRepository: MongoLockRepository = mock[MongoLockRepository]
-  val mockConfig: Configuration = mock[Configuration]
-  val mockTimeMachine: TimeMachine = mock[TimeMachine]
+  val mockLockRepository: MongoLockRepository                    = mock[MongoLockRepository]
+  val mockConfig: Configuration                                  = mock[Configuration]
+  val mockTimeMachine: TimeMachine                               = mock[TimeMachine]
   val mockFileNotificationRepository: FileNotificationRepository = mock[FileNotificationRepository]
-  val jobName = "HandleStuckNotificationsJob"
+  val jobName                                                    = "HandleStuckNotificationsJob"
 
-  val mongoLockId: String = s"schedules.$jobName"
-  val mongoLockTimeout: Int = 123
+  val mongoLockId: String       = s"schedules.$jobName"
+  val mongoLockTimeout: Int     = 123
   val releaseDuration: Duration = mongoLockTimeout.seconds
+
+  val mockLock = Lock(mongoLockId, "owner", Instant.now(), Instant.now().plusSeconds(60))
 
   val mockDateTime: Instant = LocalDateTime.of(2022, 1, 1, 0, 0, 0).toInstant(ZoneOffset.UTC)
   val notification: SDESNotification = SDESNotification(
@@ -62,7 +64,6 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
     audit = SDESAudit("file 1")
   )
 
-
   val notificationRecord: SDESNotificationRecord = SDESNotificationRecord(
     reference = "ref1",
     status = RecordStatusEnum.PENDING,
@@ -75,21 +76,22 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
 
   val notificationsInDifferentStates: Seq[SDESNotificationRecord] = Seq(
     notificationRecord,
-    notificationRecord.copy(reference= "ref2", updatedAt = mockDateTime.minusSeconds(1), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
+    notificationRecord.copy(reference = "ref2", updatedAt = mockDateTime.minusSeconds(1), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES),
     notificationRecord.copy(reference = "ref3", updatedAt = mockDateTime.plus(1, HOURS), status = RecordStatusEnum.FILE_RECEIVED_IN_SDES)
   )
 
   class Setup(withMongoLockStubs: Boolean = true) {
+
     reset(mockLockRepository, mockConfig, mockFileNotificationRepository, mockTimeMachine)
     val service = new HandleStuckNotificationsService(mockLockRepository, mockFileNotificationRepository, mockTimeMachine, mockConfig, appConfig)
     when(mockConfig.get[Int](ArgumentMatchers.eq(s"schedules.${service.jobName}.mongoLockTimeout"))(ArgumentMatchers.any()))
       .thenReturn(mongoLockTimeout)
     when(mockTimeMachine.now).thenReturn(mockDateTime.plus(appConfig.numberOfMinutesToWaitUntilNotificationRetried, MINUTES))
     if (withMongoLockStubs) {
-      when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
-        .thenReturn(Future.successful(true))
+      when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any[String](), ArgumentMatchers.eq(releaseDuration)))
+        .thenReturn(Future.successful(Some(mockLock)))
       when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(None))
     }
   }
 
@@ -103,51 +105,65 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
     }
 
     "process the notifications and return Right if they all succeed - only process if updatedAt + X minutes < now (X defined from config)" in new Setup {
-      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(notificationsInDifferentStates))
-      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(notificationsInDifferentStates))
-      when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any())).thenReturn(Future.successful(
-        notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now().toInstant(ZoneOffset.UTC))
-      ))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT))
+        .thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES))
+        .thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any())).thenReturn(
+        Future.successful(
+          notificationRecord.copy(
+            reference = "ref2",
+            status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY,
+            updatedAt = LocalDateTime.now().toInstant(ZoneOffset.UTC))
+        ))
       val result: Either[ScheduleStatus.JobFailed, String] = await(service.invoke)
       result.isRight shouldBe true
       result.getOrElse("fail") shouldBe "Processed all notifications"
-      verify(mockFileNotificationRepository, times(1)).updateFileNotification(ArgumentMatchers.eq("ref2"), ArgumentMatchers.eq(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY))
+      verify(mockFileNotificationRepository, times(1))
+        .updateFileNotification(ArgumentMatchers.eq("ref2"), ArgumentMatchers.eq(RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY))
     }
 
     "process the notifications and return Left if some fail" in new Setup {
       val exception = new Exception("woopsy")
-      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(notificationsInDifferentStates))
-      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT))
+        .thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES))
+        .thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any()))
-        .thenReturn(Future.failed(exception), Future.successful(notificationRecord.copy(reference = "ref2", status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY, updatedAt = LocalDateTime.now().toInstant(ZoneOffset.UTC))))
-      withCaptureOfLoggingFrom(logger) {
-        logs => {
-          val result = await(service.invoke)
-          result.isLeft shouldBe true
-          result.left.getOrElse(UnknownProcessingException) shouldBe FailedToProcessNotifications
-          eventually {
-            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION.toString)) shouldBe true
-            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION.toString)) shouldBe true
-          }
+        .thenReturn(
+          Future.failed(exception),
+          Future.successful(
+            notificationRecord.copy(
+              reference = "ref2",
+              status = RecordStatusEnum.NOT_PROCESSED_PENDING_RETRY,
+              updatedAt = LocalDateTime.now().toInstant(ZoneOffset.UTC)))
+        )
+      withCaptureOfLoggingFrom(logger) { logs =>
+        val result = await(service.invoke)
+        result.isLeft shouldBe true
+        result.left.getOrElse(UnknownProcessingException) shouldBe FailedToProcessNotifications
+        eventually {
+          logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION.toString)) shouldBe true
+          logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION.toString)) shouldBe true
         }
       }
     }
 
     "process the notifications and return Left if all fail" in new Setup {
       val exception = new Exception("woopsy")
-      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT)).thenReturn(Future.successful(notificationsInDifferentStates))
-      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES)).thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.SENT))
+        .thenReturn(Future.successful(notificationsInDifferentStates))
+      when(mockFileNotificationRepository.getNotificationsInState(RecordStatusEnum.FILE_RECEIVED_IN_SDES))
+        .thenReturn(Future.successful(notificationsInDifferentStates))
       when(mockFileNotificationRepository.updateFileNotification(ArgumentMatchers.any(), ArgumentMatchers.any()))
         .thenReturn(Future.failed(exception))
-      withCaptureOfLoggingFrom(logger) {
-        logs => {
-          val result = await(service.invoke)
-          result.isLeft shouldBe true
-          result.left.getOrElse(UnknownProcessingException) shouldBe FailedToProcessNotifications
-          eventually {
-            logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION.toString)) shouldBe true
-            logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION.toString)) shouldBe true
-          }
+      withCaptureOfLoggingFrom(logger) { logs =>
+        val result = await(service.invoke)
+        result.isLeft shouldBe true
+        result.left.getOrElse(UnknownProcessingException) shouldBe FailedToProcessNotifications
+        eventually {
+          logs.exists(_.getMessage.contains(PagerDutyKeys.UNKNOWN_PROCESSING_EXCEPTION.toString)) shouldBe true
+          logs.exists(_.getMessage.contains(PagerDutyKeys.FAILED_TO_PROCESS_FILE_NOTIFICATION.toString)) shouldBe true
         }
       }
     }
@@ -157,9 +173,9 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
     "return a Future successful when lockRepository is able to lock and unlock successfully" in new Setup {
       val expectingResult: Future[Right[Nothing, String]] = Future.successful(Right("hello"))
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
-        .thenReturn(Future.successful(true))
+        .thenReturn(Future.successful(Some(mockLock)))
       when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(None))
       await(service.tryLock(expectingResult)) shouldBe Right("hello")
       verify(mockLockRepository, times(1)).takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any())
@@ -168,11 +184,12 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
     s"return a $Right ${Seq.empty} is lock returns Future.successful (false)" in new Setup {
       val expectingResult: Future[Right[Nothing, String]] = Future.successful(Right("hello"))
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
-        .thenReturn(Future.successful(false))
+        .thenReturn(Future.successful(None))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Right(s"$jobName - JobAlreadyRunning")
         capturedLogEvents.exists(_.getMessage == s"[$jobName] Locked because it might be running on another instance") shouldBe true
-        capturedLogEvents.exists(event => event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Locked because it might be running on another instance") shouldBe true
+        capturedLogEvents.exists(event =>
+          event.getLevel.levelStr == "INFO" && event.getMessage == s"[$jobName] Locked because it might be running on another instance") shouldBe true
       }
       verify(mockLockRepository, times(1)).takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration))
       verify(mockLockRepository, times(0)).releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any())
@@ -180,7 +197,7 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and succeeds" in new Setup {
       val expectingResult: Future[Right[Nothing, String]] = Future.successful(Right("hello"))
-      val exception = new Exception("woopsy")
+      val exception                                       = new Exception("woopsy")
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
       when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
@@ -198,7 +215,7 @@ class HandleStuckNotificationsServiceSpec extends SpecBase with LogCapturing {
 
     s"return $Left ${MongoLockResponses.UnknownException} if lock returns exception, release lock is still called and failed also" in new Setup {
       val expectingResult: Future[Right[Nothing, String]] = Future.successful(Right("hello"))
-      val exception = new Exception("not again")
+      val exception                                       = new Exception("not again")
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
         .thenReturn(Future.failed(exception))
       when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
