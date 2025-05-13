@@ -28,10 +28,11 @@ import uk.gov.hmrc.mongo.lock.MongoLockRepository
 import utils.LogCapturing
 import utils.Logger.logger
 import utils.PagerDutyHelper.PagerDutyKeys
-
+import uk.gov.hmrc.mongo.lock.{Lock}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, DurationInt}
+import java.time.Instant
 
 class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
   val mockLockRepository: MongoLockRepository = mock[MongoLockRepository]
@@ -42,6 +43,7 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
   val mongoLockId: String = s"schedules.$jobName"
   val mongoLockTimeout: Int = 123
   val releaseDuration: Duration = mongoLockTimeout.seconds
+  val mockLock = Lock(mongoLockId, "owner", Instant.now(), Instant.now().plusSeconds(60))
 
   class Setup(withMongoLockStubs: Boolean = true) {
     reset(mockLockRepository, mockLockRepository, mockConfig, mockRepo)
@@ -52,9 +54,9 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
 
     if (withMongoLockStubs) {
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
-        .thenReturn(Future.successful(true))
+        .thenReturn(Future.successful(Some(mockLock)))
       when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(None))
     }
   }
 
@@ -101,9 +103,9 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
     "return a Future successful when lockRepository is able to lock and unlock successfully" in new Setup {
       val expectingResult: Future[Right[Nothing, Seq[Nothing]]] = Future.successful(Right(Seq.empty))
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
-        .thenReturn(Future.successful(true))
+        .thenReturn(Future.successful(Some(mockLock)))
       when(mockLockRepository.releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any()))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(None))
       await(service.tryLock(expectingResult)) shouldBe Right(Seq.empty)
       verify(mockLockRepository, times(1)).takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration))
       verify(mockLockRepository, times(1)).releaseLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any())
@@ -112,7 +114,7 @@ class MonitoringJobServiceSpec extends SpecBase with LogCapturing {
     s"return a $Right ${Seq.empty} if lock returns Future.successful (false)" in new Setup {
       val expectingResult = Future.successful(Right(Seq.empty))
       when(mockLockRepository.takeLock(ArgumentMatchers.eq(mongoLockId), ArgumentMatchers.any(), ArgumentMatchers.eq(releaseDuration)))
-        .thenReturn(Future.successful(false))
+        .thenReturn(Future.successful(None))
       withCaptureOfLoggingFrom(logger) { capturedLogEvents =>
         await(service.tryLock(expectingResult)) shouldBe Right(Seq(s"$jobName - JobAlreadyRunning"))
         capturedLogEvents.exists(_.getMessage == s"[$jobName] Locked because it might be running on another instance") shouldBe true
