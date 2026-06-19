@@ -86,9 +86,9 @@ class FileNotificationRepository @Inject()(mongoComponent: MongoComponent,
     result.flatMap { records =>
       if(records.nonEmpty && records.head.status.equals(FILE_PROCESSED_IN_SDES)) {
         logger.info(s"[FileNotificationRepository][updateFileNotification] - Record $reference already processed skipping update")
-        Future(records.head)
+        Future.successful(records.head)
       } else {
-        logger.info(s"[FileNotificationRepository][updateFileNotification] - Updating record $reference in Mongo")
+        logger.info(s"[FileNotificationRepository][updateFileNotification] - Updating record $reference in Mongo with status $updatedStatus")
         collection.findOneAndUpdate(equal("reference", reference), combine(
           if (updatedStatus == NOT_PROCESSED_PENDING_RETRY || updatedStatus == FAILED_PENDING_RETRY || updatedStatus == FILE_NOT_RECEIVED_IN_SDES_PENDING_RETRY)
             set("nextAttemptAt", Codecs.toBson(timeMachine.now.plus(appConfig.minutesUntilNextAttemptOnCallbackFailure, MINUTES)))
